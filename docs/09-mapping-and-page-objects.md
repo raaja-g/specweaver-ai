@@ -9,8 +9,11 @@ Example actions:
 
 - API mapping via OpenAPI for endpoints, auth, and payload schemas.
 
-#### Locator Repository (YAML example)
+#### Locator Repository (examples)
 
+These are illustrative only; at runtime, the framework derives/updates locators from inputs (story, DOM/API, rules). We do not pre-create files unless the user supplies them.
+
+YAML format:
 ```yaml
 version: 1
 pages:
@@ -35,7 +38,7 @@ pages:
       - click: "button:has-text('Place order')"
 ```
 
-#### Locator Repository (JSON example)
+JSON format:
 
 ```json
 {
