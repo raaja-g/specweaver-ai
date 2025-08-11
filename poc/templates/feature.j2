@@ -1,0 +1,26 @@
+Feature: {{ requirement.title }}
+  As a {{ requirement.actor }}
+  I want {{ requirement.goal }}
+  So that {{ requirement.benefit }}
+
+  Background:
+    Given the test environment is configured
+    And execution mode is set to "{{ config.uiMode }}" for UI and "{{ config.apiMode }}" for API
+
+{% for test_case in test_cases %}
+  @{{ test_case.priority }} @{{ test_case.type }}{% for tag in test_case.tags %} @{{ tag }}{% endfor %}
+  Scenario: {{ test_case.title }}
+    {% for precondition in test_case.preconditions %}
+    Given {{ precondition }}
+    {% endfor %}
+    {% for step in test_case.steps %}
+    When I perform "{{ step.action }}" with params:
+      """
+      {{ step.params | tojson(indent=2) }}
+      """
+    {% endfor %}
+    {% for expectation in test_case.expected %}
+    Then {{ expectation }}
+    {% endfor %}
+
+{% endfor %}

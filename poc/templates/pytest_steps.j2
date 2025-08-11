@@ -1,0 +1,103 @@
+"""
+Generated step definitions for {{ requirement.title }}
+Generated at: {{ timestamp }}
+"""
+from pytest_bdd import given, when, then, scenarios, parsers
+from playwright.sync_api import Page, expect
+import json
+import httpx
+from typing import Dict, Any
+
+# Load scenarios from feature file
+scenarios('../features/{{ feature_file }}')
+
+
+@given('the test environment is configured')
+def setup_environment(page: Page):
+    """Setup test environment"""
+    # Configure based on execution mode
+    pass
+
+
+@given('execution mode is set to "<ui_mode>" for UI and "<api_mode>" for API')
+def set_execution_mode(ui_mode: str, api_mode: str):
+    """Set execution modes"""
+    # Store in context for later use
+    pass
+
+{% for precondition in all_preconditions %}
+@given('{{ precondition }}')
+def given_{{ precondition | replace(" ", "_") | lower }}(page: Page):
+    """Precondition: {{ precondition }}"""
+    # TODO: Implement precondition setup
+    pass
+{% endfor %}
+
+@when(parsers.parse('I perform "{action}" with params:\n{params}'))
+def perform_action(page: Page, action: str, params: str):
+    """Execute action with parameters"""
+    params_dict = json.loads(params)
+    
+    # Route to appropriate handler based on action
+    action_handlers = {
+        {% for action in unique_actions %}
+        "{{ action }}": handle_{{ action | replace(".", "_") }},
+        {% endfor %}
+    }
+    
+    if handler := action_handlers.get(action):
+        handler(page, params_dict)
+    else:
+        raise NotImplementedError(f"Action {action} not implemented")
+
+{% for action in unique_actions %}
+def handle_{{ action | replace(".", "_") }}(page: Page, params: Dict[str, Any]):
+    """Handle {{ action }} action"""
+    {% if "auth" in action %}
+    # Authentication action
+    page.fill("#username", params.get("username", ""))
+    page.fill("#password", params.get("password", ""))
+    page.click("button[type='submit']")
+    {% elif "product" in action and "add" in action %}
+    # Add product to cart
+    sku = params.get("sku", "")
+    page.click(f"[data-sku='{sku}'] button:has-text('Add to cart')")
+    {% elif "cart" in action %}
+    # Cart actions
+    page.click("#cart-icon")
+    if "checkout" in "{{ action }}":
+        page.click("button:has-text('Checkout')")
+    {% elif "payment" in action %}
+    # Payment actions
+    page.fill("#card-number", params.get("cardNumber", ""))
+    page.fill("#expiry", params.get("expiry", ""))
+    page.fill("#cvv", params.get("cvv", ""))
+    {% elif "order" in action %}
+    # Order actions
+    page.click("button:has-text('Place Order')")
+    {% else %}
+    # Generic action
+    # TODO: Implement {{ action }}
+    pass
+    {% endif %}
+{% endfor %}
+
+{% for expectation in all_expectations %}
+@then('{{ expectation }}')
+def then_{{ expectation | replace(" ", "_") | lower }}(page: Page):
+    """Verify: {{ expectation }}"""
+    {% if "error" in expectation.lower() %}
+    # Check for error message
+    expect(page.locator(".error-message")).to_be_visible()
+    {% elif "confirmation" in expectation.lower() or "success" in expectation.lower() %}
+    # Check for success/confirmation
+    expect(page.locator(".success-message, .confirmation")).to_be_visible()
+    {% elif "displayed" in expectation.lower() or "shown" in expectation.lower() %}
+    # Check visibility
+    expect(page.locator(".result")).to_be_visible()
+    {% else %}
+    # Generic assertion
+    # TODO: Implement specific assertion for: {{ expectation }}
+    pass
+    {% endif %}
+{% endfor %}
