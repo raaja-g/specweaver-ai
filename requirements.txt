@@ -1,1 +1,8 @@
-# Python dependencies for MVP
+pydantic>=2
+jinja2
+typer
+pyyaml
+faker
+pytest
+pytest-bdd
+httpx
