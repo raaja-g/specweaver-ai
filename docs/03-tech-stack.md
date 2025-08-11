@@ -17,6 +17,7 @@
  - Observability: Prometheus metrics, basic logs; Allure results ingestion
  - Orchestration: n8n (self-hosted) for agent workflows and human checkpoints
  - Domain Abstraction: Domain Pack plugin interface (YAML/JSON + Python hooks)
+ - Security: Gitleaks (secret scanning), AWS Secrets Manager (prod), dotenv/.env (local), Docker secrets
 
 #### Justification
 - Python: rich ecosystem for testing, NLP, templating.
@@ -38,3 +39,6 @@
  - Chart.js: simple, effective charts for QA metrics and trends.
  - n8n: visual, extensible workflow engine to compose agents, approvals, and external tools; easy Docker deployment.
  - Domain Pack plugins: allow swapping domain-specific enrichments without changing the core engine.
+ - Gitleaks: CI guardrail to prevent credential leaks.
+ - AWS Secrets Manager: centralized, rotated secrets in production; IAM-scoped access from containers.
+ - dotenv/Docker secrets: simple, safe secret injection for local and containerized dev.

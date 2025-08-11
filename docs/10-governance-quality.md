@@ -36,3 +36,11 @@
 - Auto-PR is allowed only when local run passes in the selected `executionMode` and docs-lint succeeds locally.
 - Branch naming: `feature/tests/<story-id>-<slug>`; PR includes links to Allure report and artifacts.
 - Require at least one reviewer and the docs-lint workflow to pass before merge.
+
+#### Secrets & Supply Chain
+- Secrets handling:
+  - Local: `.env` (dotenv) loaded at runtime; `.env` is gitignored.
+  - CI: use repository or environment secrets; never print in logs.
+  - Production: AWS Secrets Manager; containers assume IAM role to fetch at startup.
+- Secret scanning: run Gitleaks in CI on PRs and main branch pushes.
+- Docker images: minimal base, no secrets baked, multi-stage builds; SBOM artifact for each build.

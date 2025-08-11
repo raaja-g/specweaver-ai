@@ -56,6 +56,7 @@ alembic
 jinja2
 python-dotenv
 n8n (external docker)
+gitleaks (CI)
 ```
 
 #### Run
@@ -116,12 +117,23 @@ Execution mode toggles:
 ```
 docker build -t specweaver-mcp .
 docker run --rm -it \
-  -e GROQ_API_KEY=$GROQ_API_KEY \
-  -e GOOGLE_API_KEY=$GOOGLE_API_KEY \
-  -e OPENAI_API_KEY=$OPENAI_API_KEY \
+  --env-file .env \
   -p 8765:8765 \
   specweaver-mcp
 ```
 
 Then register the MCP server in your IDE (Cursor) as a custom MCP endpoint (WebSocket or stdio bridge) and use the tools:
 - `parse_requirement`, `generate_test_cases`, `synthesize_scripts`, `validate_artifacts`, `run_tests`.
+
+#### Production Docker (AWS)
+
+Use AWS Secrets Manager and Docker secrets:
+```
+docker run --rm -it \
+  -e AWS_REGION=us-east-1 \
+  -e AWS_ROLE_ARN=... \
+  -e SECRETS_PREFIX=/specweaver/prod/ \
+  -p 8765:8765 \
+  specweaver-mcp
+```
+The container on startup fetches secrets `GROQ_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY` from `SECRETS_PREFIX` and exposes them as env vars. No secrets are baked into images.
