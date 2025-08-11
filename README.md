@@ -2,7 +2,7 @@
 
 A framework to parse user stories, generate structured test cases, and synthesize runnable automation scripts.
 
-- Domain: E-commerce (ShopSmart)
+- Domain: Domain-agnostic core (optional Domain Packs for e-commerce, healthcare, fintech, etc.)
 - Tests: pytest + Playwright
 - NLP/AI: LLM + spaCy
 

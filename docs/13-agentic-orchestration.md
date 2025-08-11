@@ -8,6 +8,7 @@
 - Self-Heal Advisor Agent: proposes selector alternatives on failures.
 - Runner Agent: triggers pytest-bdd runs and forwards results to the dashboard.
 - Governance Agent: enforces policies (reuse-first, mode discipline), collects provenance, and requests HIL approvals.
+ - Domain Knowledge Agent (optional): supplies domain-specific enrichments when a Domain Pack is selected; otherwise bypassed.
 
 #### n8n Workflow Sketch
 - Trigger (API/UI webhook/MCP tool) → Parser → Designer → Reuse Scanner → HIL Approval (manual node) → Synthesizer → Local Run (mock|stub|real) → If PASS then Commit + Auto-PR → Runner (CI) → Metrics Ingest → Dashboard update.

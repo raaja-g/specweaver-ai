@@ -16,6 +16,7 @@
  - Backend API: FastAPI (OpenAPI-first), Celery/RQ for workers, Redis for queue, SQLite/Postgres for results
  - Observability: Prometheus metrics, basic logs; Allure results ingestion
  - Orchestration: n8n (self-hosted) for agent workflows and human checkpoints
+ - Domain Abstraction: Domain Pack plugin interface (YAML/JSON + Python hooks)
 
 #### Justification
 - Python: rich ecosystem for testing, NLP, templating.
@@ -36,3 +37,4 @@
  - Celery/RQ + Redis: background job processing for long test runs.
  - Chart.js: simple, effective charts for QA metrics and trends.
  - n8n: visual, extensible workflow engine to compose agents, approvals, and external tools; easy Docker deployment.
+ - Domain Pack plugins: allow swapping domain-specific enrichments without changing the core engine.

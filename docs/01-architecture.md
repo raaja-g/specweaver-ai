@@ -45,12 +45,16 @@ flowchart LR
     TMP["Templates\n(Jinja2)"]
     VDB["Vector DB\n(Embeddings)"]
     CFG["Config\n(mock|stub|real)"]
+    DP["Domain Packs\n(intents, taxonomy, examples)"]
   end
 
   PE <---> VDB
   CSM ---- TMP
   CSM ---- LOC
   CSM ---- OAS
+  PE ---- DP
+  TCG ---- DP
+  CSM ---- DP
 
   subgraph Governance
     HIL["Human-in-the-loop Reviews"]

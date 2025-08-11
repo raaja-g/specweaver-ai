@@ -53,7 +53,8 @@
     },
     "assumptions": { "type": "array", "items": { "type": "string" } },
     "risks": { "type": "array", "items": { "type": "string" } },
-    "tags": { "type": "array", "items": { "type": "string" } }
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "domain": { "type": "string", "description": "Optional domain hint (e.g., ecommerce, healthcare)" }
   }
 }
 ```
@@ -96,7 +97,8 @@
     },
     "data": { "type": "object", "additionalProperties": true },
     "expected": { "type": "array", "items": { "type": "string" } },
-    "tags": { "type": "array", "items": { "type": "string" } }
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "domain": { "type": "string", "description": "Optional domain hint inherited from RequirementGraph" }
   }
 }
 ```

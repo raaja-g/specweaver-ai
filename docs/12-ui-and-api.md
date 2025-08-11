@@ -5,6 +5,7 @@
 - Human-in-the-loop approval of generated BDD tests before persistence.
 - Dashboard with QA metrics and trends (pass rate, AC coverage, flakiness, time-to-green).
 - Trigger and monitor test runs; view reports.
+ - Domain-agnostic UX with optional Domain Pack selection; defaults to core engine.
 
 #### UI Pages
 - Dashboard: KPIs, trend charts, recent runs, flaky test list.
@@ -14,7 +15,7 @@
 
 #### API Endpoints (FastAPI, OpenAPI-described)
 - POST /requirements: upload/compose story; returns draft artifact ids.
-- POST /requirements/{id}/generate?coverage=basic|comprehensive: produce graph and cases.
+- POST /requirements/{id}/generate?coverage=basic|comprehensive&domain=<pack|none>: produce graph and cases with optional Domain Pack.
 - POST /requirements/{id}/approve: persist and commit features/steps/tests.
 - POST /runs: trigger run with params {suite/tags, executionMode: mock|stub|real}.
 - GET /runs/{id}: status + links to reports.
