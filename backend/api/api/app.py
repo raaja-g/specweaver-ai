@@ -13,6 +13,7 @@ from datetime import datetime
 import logging
 import sys
 import os
+import difflib
 
 # Add backend core to path
 sys.path.append(str(Path(__file__).parent.parent / "core"))
@@ -89,6 +90,17 @@ def _append_metrics(summary: Dict[str, Any]) -> None:
         metrics_file.write_text(json.dumps(arr, indent=2))
     except Exception:
         logger.exception("Failed to append metrics")
+
+
+def _read_metrics_history() -> List[Dict[str, Any]]:
+    metrics_file = ARTIFACTS_DIR / "metrics.json"
+    if not metrics_file.exists():
+        return []
+    try:
+        return json.loads(metrics_file.read_text())
+    except Exception:
+        logger.exception("Failed to read metrics history")
+        return []
 
 
 class RequirementUpload(BaseModel):
@@ -449,7 +461,8 @@ async def get_metrics():
             "ui_mock": sum(1 for r in test_runs.values() if r.get("ui_mode") == "mock"),
             "api_real": sum(1 for r in test_runs.values() if r.get("api_mode") == "real"),
             "api_mock": sum(1 for r in test_runs.values() if r.get("api_mode") == "mock")
-        }
+        },
+        "history": _read_metrics_history()
     }
 
 
@@ -465,6 +478,57 @@ async def download_artifact(session_id: str, filename: str):
         filename=filename,
         media_type="application/json"
     )
+
+
+@app.post("/api/requirements/{session_id}/preview")
+async def preview_tests(session_id: str, body: Dict[str, Any]):
+    """Generate preview code for selected tests and return diffs before approval"""
+    if session_id not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    try:
+        session = sessions[session_id]
+        requirement: RequirementGraph = session["requirement"]
+        test_suite: TestSuite = session["test_suite"]
+        selected_ids: List[str] = body.get("test_case_ids") or [tc.id for tc in test_suite.test_cases]
+
+        # Filter tests
+        filtered_cases = [tc for tc in test_suite.test_cases if tc.id in selected_ids]
+        preview_suite = TestSuite(requirement_id=requirement.id, test_cases=filtered_cases)
+
+        # Synthesize into artifacts preview dir
+        preview_dir = ARTIFACTS_DIR / session_id / "preview"
+        synthesizer = CodeSynthesizer()
+        files = synthesizer.synthesize(requirement, preview_suite, ExecutionConfig(), preview_dir)
+
+        diffs: List[Dict[str, Any]] = []
+        for kind, path in files.items():
+            prev_path = Path(path)
+            # Map to potential existing file in tests
+            existing_candidates = []
+            if prev_path.suffix in {".py", ".feature"}:
+                # naive mapping to tests directory by filename
+                existing_candidates = list(Path("tests").rglob(prev_path.name))
+            diff_text = ""
+            exists = False
+            if existing_candidates:
+                exists = True
+                try:
+                    old_text = existing_candidates[0].read_text().splitlines(keepends=True)
+                    new_text = prev_path.read_text().splitlines(keepends=True)
+                    diff_lines = difflib.unified_diff(old_text, new_text, fromfile=str(existing_candidates[0]), tofile=str(prev_path))
+                    diff_text = "".join(diff_lines)
+                except Exception:
+                    diff_text = ""
+            diffs.append({
+                "type": kind,
+                "preview_path": str(prev_path),
+                "exists": exists,
+                "diff": diff_text
+            })
+        return {"session_id": session_id, "diffs": diffs}
+    except Exception as e:
+        logger.exception("Preview failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
