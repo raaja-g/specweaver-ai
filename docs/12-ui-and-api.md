@@ -38,10 +38,15 @@
 #### Metrics Ingestion
 - Parse pytest/Allure results; compute KPIs (pass rate, duration, flaky rate).
 - Persist time-series for dashboard charts.
+ - Suggested DB schema (simplified):
+   - runs(id, created_at, ui_mode, api_mode, status, duration_ms, allure_path)
+   - kpis(run_id, pass_rate, failures, flakes, total, avg_duration_ms)
+   - tests(run_id, name, status, duration_ms, tags, trace_to)
 
 #### Security & Governance
 - AuthN: local dev simple token; prod-ready pluggable provider.
 - AuthZ: approve/write actions gated; audit logs for reviews and runs.
 - Rate limiting for generation endpoints.
+ - Secrets: local via `.env`; CI via GitHub secrets; prod via AWS Secrets Manager; never store secrets in Git.
 
 

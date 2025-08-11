@@ -111,6 +111,7 @@ Execution mode toggles:
 - Use any stable demo site for a visual run, or keep to JSON generation to avoid external dependencies.
 - Embed schema and prompt versions in the artifacts for traceability.
 - Provider order (auto): Groq → Gemini → Cursor CLI → OpenAI. You can force a provider via `--provider groq|gemini|cursor|openai`.
+ - Local hybrid: configure Ollama/vLLM for local open model; redact PII before cloud calls.
 
 #### MCP (Docker Desktop) Quickstart
 
