@@ -8,6 +8,11 @@ from typing import Optional, Dict, Any, List
 from enum import Enum
 from dataclasses import dataclass
 import time
+from pathlib import Path
+try:
+    import yaml  # type: ignore
+except Exception:
+    yaml = None
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +43,7 @@ class LLMOrchestrator:
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or {}
+        self.model_config = self._load_model_config()
         self.providers = self._initialize_providers()
         self.sensitive_patterns = ["password", "ssn", "credit", "medical"]
         
@@ -66,7 +72,7 @@ class LLMOrchestrator:
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=gemini_key)
-                providers[LLMProvider.GEMINI] = genai.GenerativeModel('gemini-1.5-flash')
+                providers[LLMProvider.GEMINI] = genai  # keep module; instantiate model per call
             except ImportError:
                 logger.warning("Google Generative AI not available")
         
@@ -79,6 +85,24 @@ class LLMOrchestrator:
                 logger.warning("OpenAI SDK not available")
         
         return providers
+
+    def _load_model_config(self) -> Dict[str, str]:
+        """Load model names from config/llm.yml and/or env vars."""
+        defaults = {
+            "local": os.getenv("LOCAL_MODEL", "llama3.2"),
+            "groq": os.getenv("GROQ_MODEL", "compound-beta"),
+            "gemini": os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+            "openai": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        }
+        cfg_path = Path("config/llm.yml")
+        if cfg_path.exists() and yaml is not None:
+            try:
+                data = yaml.safe_load(cfg_path.read_text()) or {}
+                models = (data.get("models") or {})
+                defaults.update({k: v for k, v in models.items() if isinstance(v, str) and v})
+            except Exception:
+                logger.warning("Failed to load config/llm.yml; using env/defaults")
+        return defaults
     
     def _is_sensitive(self, text: str) -> bool:
         """Check if text contains sensitive data"""
@@ -113,7 +137,7 @@ class LLMOrchestrator:
             start = time.time()
             client = self.providers[LLMProvider.LOCAL]
             response = client.generate(
-                model="llama3.2",
+                model=self.model_config.get("local", "llama3.2"),
                 prompt=f"{system}\n\n{prompt}"
             )
             latency = (time.time() - start) * 1000
@@ -121,7 +145,7 @@ class LLMOrchestrator:
             return LLMResponse(
                 content=response['response'],
                 provider=LLMProvider.LOCAL,
-                model="llama3.2",
+                model=self.model_config.get("local", "llama3.2"),
                 latency_ms=latency
             )
         except Exception as e:
@@ -137,7 +161,7 @@ class LLMOrchestrator:
             start = time.time()
             client = self.providers[LLMProvider.GROQ]
             response = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model=self.model_config.get("groq", "compound-beta"),
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": prompt}
@@ -150,7 +174,7 @@ class LLMOrchestrator:
             return LLMResponse(
                 content=response.choices[0].message.content,
                 provider=LLMProvider.GROQ,
-                model="llama-3.3-70b",
+                model=self.model_config.get("groq", "compound-beta"),
                 latency_ms=latency,
                 token_count=response.usage.total_tokens if response.usage else None
             )
@@ -165,14 +189,16 @@ class LLMOrchestrator:
         
         try:
             start = time.time()
-            model = self.providers[LLMProvider.GEMINI]
+            genai = self.providers[LLMProvider.GEMINI]
+            model_name = self.model_config.get("gemini", "gemini-1.5-flash")
+            model = genai.GenerativeModel(model_name)
             response = model.generate_content(f"{system}\n\n{prompt}")
             latency = (time.time() - start) * 1000
             
             return LLMResponse(
                 content=response.text,
                 provider=LLMProvider.GEMINI,
-                model="gemini-1.5-flash",
+                model=model_name,
                 latency_ms=latency
             )
         except Exception as e:
@@ -188,7 +214,7 @@ class LLMOrchestrator:
             start = time.time()
             client = self.providers[LLMProvider.OPENAI]
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=self.model_config.get("openai", "gpt-4o-mini"),
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": prompt}
@@ -201,7 +227,7 @@ class LLMOrchestrator:
             return LLMResponse(
                 content=response.choices[0].message.content,
                 provider=LLMProvider.OPENAI,
-                model="gpt-4o-mini",
+                model=self.model_config.get("openai", "gpt-4o-mini"),
                 latency_ms=latency,
                 token_count=response.usage.total_tokens if response.usage else None
             )
