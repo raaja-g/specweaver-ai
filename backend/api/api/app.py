@@ -12,7 +12,6 @@ import uuid
 from datetime import datetime
 import logging
 import sys
-import os
 
 # Add backend core to path
 sys.path.append(str(Path(__file__).parent.parent / "core"))
@@ -47,33 +46,6 @@ ARTIFACTS_DIR.mkdir(exist_ok=True)
 # In-memory store (would use Redis/DB in production)
 sessions = {}
 test_runs = {}
-RUNS_FILE = ARTIFACTS_DIR / "run_status.json"
-
-def _save_runs():
-    try:
-        RUNS_FILE.write_text(json.dumps({k: _serialize_run(v) for k, v in test_runs.items()}, default=str, indent=2))
-    except Exception:
-        logger.exception("Failed to persist run status")
-
-def _load_runs():
-    if RUNS_FILE.exists():
-        try:
-            data = json.loads(RUNS_FILE.read_text())
-            for k, v in data.items():
-                # Convert iso timestamps back to datetime if present
-                for ts_field in ["created_at", "started_at", "completed_at"]:
-                    if v.get(ts_field):
-                        v[ts_field] = datetime.fromisoformat(v[ts_field])
-            test_runs.update(data)
-        except Exception:
-            logger.exception("Failed to load run status")
-
-def _serialize_run(run: Dict[str, Any]) -> Dict[str, Any]:
-    out = run.copy()
-    for k in ["created_at", "started_at", "completed_at"]:
-        if isinstance(out.get(k), datetime):
-            out[k] = out[k].isoformat()
-    return out
 
 
 class RequirementUpload(BaseModel):
@@ -261,21 +233,8 @@ async def run_tests(req: RunRequest, background_tasks: BackgroundTasks):
         "created_at": datetime.utcnow()
     }
     
-    # Queue background execution via RQ if available, else fallback to FastAPI background task
-    use_rq = os.getenv("REDIS_URL") is not None
-    if use_rq:
-        try:
-            import redis
-            from rq import Queue
-            conn = redis.from_url(os.getenv("REDIS_URL"))
-            q = Queue("specweaver", connection=conn, default_timeout=3600)
-            q.enqueue("backend.api.worker.run_tests_job", run_id, req.session_id, req.ui_mode, req.api_mode)
-            test_runs[run_id]["status"] = "queued"
-        except Exception as e:
-            logger.exception("RQ enqueue failed, falling back to BackgroundTasks")
-            background_tasks.add_task(execute_tests, run_id, req)
-    else:
-        background_tasks.add_task(execute_tests, run_id, req)
+    # Queue background execution
+    background_tasks.add_task(execute_tests, run_id, req)
     
     return {
         "run_id": run_id,
@@ -312,11 +271,10 @@ async def execute_tests(run_id: str, req: RunRequest):
         test_runs[run_id]["output"] = result.stdout
         test_runs[run_id]["errors"] = result.stderr
         test_runs[run_id]["exit_code"] = result.returncode
-        _save_runs()
+        
     except Exception as e:
         test_runs[run_id]["status"] = "error"
         test_runs[run_id]["error"] = str(e)
-        _save_runs()
 
 
 @app.get("/api/runs/{run_id}")
