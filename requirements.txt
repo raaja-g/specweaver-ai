@@ -6,3 +6,5 @@ faker
 pytest
 pytest-bdd
 httpx
+uvicorn
+fastapi
