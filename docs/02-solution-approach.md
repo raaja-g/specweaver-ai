@@ -40,7 +40,7 @@
  - MCP server horizontal scaling: run multiple replicas behind the IDE or CI orchestrator; stateless with shared artifact storage.
  - API/UI scaling: separate stateless API from Web UI; use background workers for long tasks; WebSocket/SSE for run status.
  - Agentic orchestration: represent the pipeline as an agent graph in n8n; each agent has a clear contract and can request help from others or external tools; HIL checkpoints are explicit nodes.
- - Mode switching: config flag `executionMode` = `mock|stub|real` to control whether steps call test doubles (WireMock/Prism/Playwright route mocks) or real services/UI.
+ - Mode switching: per-layer flags `uiMode` (real|mock) and `apiMode` (mock|stub|real); UI defaults UI=real, API=mock; n8n/MCP/UI can override per-run.
 
 #### Metrics & Quality Gates
 

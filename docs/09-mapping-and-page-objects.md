@@ -45,3 +45,5 @@ Resolution rules:
 
 - For each `operationId` in OpenAPI, generate a canonical step name (e.g., `orders.create`) and parameter schema.
 - Validate responses against the referenced schema; support Prism/WireMock for mock/stub execution modes.
+ - Respect `apiMode`: use Prism/WireMock when `mock|stub`, use real endpoints when `real`.
+ - Respect `uiMode`: when `mock`, route Playwright network to mocks and/or use route.fulfill; when `real`, do not stub UI network by default.

@@ -38,7 +38,8 @@ Repair loop (if validation fails):
   - locator_repo: <YAML>
   - templates: <Jinja2>
   - provider_order: [groq, gemini, cursor, openai]
-  - executionMode: <mock|stub|real>
+  - uiMode: <real|mock>
+  - apiMode: <mock|stub|real>
 
 #### Provider Normalization
 

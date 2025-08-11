@@ -11,13 +11,13 @@
 - Dashboard: KPIs, trend charts, recent runs, flaky test list.
 - Create Requirement: upload markdown/gherkin or compose inline; submit for parsing/generation.
 - Review & Approve: side-by-side Requirement Graph, generated test cases, and Gherkin; approve per test or bulk.
-- Runs: queue new run, filter by tag/suite/mode; live status; link to reports.
+- Runs: queue new run, filter by tag/suite/mode; live status; link to reports; toggles for `uiMode` and `apiMode` with defaults UI=real, API=mock.
 
 #### API Endpoints (FastAPI, OpenAPI-described)
 - POST /requirements: upload/compose story; returns draft artifact ids.
 - POST /requirements/{id}/generate?coverage=basic|comprehensive&domain=<pack|none>: produce graph and cases with optional Domain Pack.
 - POST /requirements/{id}/approve: persist and commit features/steps/tests.
-- POST /runs: trigger run with params {suite/tags, executionMode: mock|stub|real}.
+- POST /runs: trigger run with params {suite/tags, uiMode: real|mock, apiMode: mock|stub|real}.
 - GET /runs/{id}: status + links to reports.
 - GET /metrics: aggregated KPIs for dashboard.
 

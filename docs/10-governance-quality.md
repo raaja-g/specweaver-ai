@@ -18,7 +18,7 @@
 - Deterministic tool I/O: strict JSON schemas for MCP tool inputs/outputs.
 - Versioned tools: include `mcpToolVersion` and `schemaVersion` in responses.
  - Reuse-first rule: block generation when an equivalent existing test is detected, unless explicitly overridden. Emit trace links to reused tests.
- - Mode discipline: enforce `executionMode` policy per branch/CI to avoid accidental real env usage.
+ - Mode discipline: enforce `uiMode`/`apiMode` policies per branch/CI to avoid accidental real env usage; UI must surface current mode clearly.
 
 #### UI HIL & Audit
 

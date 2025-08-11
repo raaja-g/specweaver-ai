@@ -44,7 +44,7 @@ flowchart LR
     OAS["OpenAPI Spec\n(API mapping)"]
     TMP["Templates\n(Jinja2)"]
     VDB["Vector DB\n(Embeddings)"]
-    CFG["Config\n(mock|stub|real)"]
+    CFG["Config\n(uiMode/apiMode)"]
     DP["Domain Packs\n(intents, taxonomy, examples)"]
   end
 
@@ -162,6 +162,7 @@ Transport: stdio in local dev; WebSocket/HTTP bridge enabled from the Docker con
 ### UI + API Responsibilities
 
 - Web UI: Upload/enter requirements, show generated test proposals (HIL approval), trigger runs, and display dashboard metrics/trends.
+- Web UI toggles: expose `uiMode` (real|mock) and `apiMode` (mock|stub|real) with defaults UI=real, API=mock; store per-run and/or as user defaults.
 - API Service: Endpoints for parse/generate/synthesize, approvals, run orchestration, artifact storage, and results ingestion.
 - Queue/Workers: Execute long-running tasks (generation and test runs) and stream status to UI.
 - Artifact Store: Persist requirement graphs, test cases, generated features/step defs/tests under the framework’s structure.

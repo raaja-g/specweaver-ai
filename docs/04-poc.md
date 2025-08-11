@@ -72,6 +72,13 @@ uvicorn ui.app:app --reload --port 8080
 docker run -it --rm -p 5678:5678 -v ~/.n8n:/home/node/.n8n n8nio/n8n
 ```
 
+Execution mode toggles:
+```
+# From UI: select uiMode=real|mock and apiMode=mock|stub|real per run
+# From API: POST /runs { uiMode: "real|mock", apiMode: "mock|stub|real" }
+# From MCP: run_tests(pytest_args, uiMode, apiMode)
+```
+
 #### Example `test_cases.json`
 
 ```json
