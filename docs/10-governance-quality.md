@@ -7,7 +7,7 @@
 
 #### LLM Orchestration Policy
 
-- Provider order: Groq → Gemini → Cursor CLI → OpenAI.
+- Provider order: Groq → Gemini → Cursor CLI → OpenAI; local open model preferred for selected tasks.
 - Record provenance: provider, model, temperature, prompt version embedded in artifacts.
 - Retry & backoff: bounded attempts per provider; fast-fail on repeated schema violations.
 - Cost/latency budget: prefer Groq (low latency) for iterative steps; fall back only when errors occur or capability is insufficient.
@@ -31,6 +31,25 @@
 - Agent roles have explicit contracts and metrics (success, latency, escalation rate).
 - Handoffs are logged with context; failures trigger fallback or human escalation in n8n.
 - Workflows are versioned; only approved versions run in CI.
+
+#### Hybrid Model Policy
+
+Local-first (sensitive/high-volume) examples:
+- Sensitive data transformations: stories or artifacts containing PII/PHI (e.g., user addresses, health data) marked by NER/dlp checks.
+- Deterministic expansions: bulk ECP/BVA case expansions or template filling where creativity is low and volume is high.
+- Embedding/RAG prep: chunking and tagging of internal docs for retrieval.
+- Prompt repair loops: schema-fix attempts for invalid JSON output.
+
+Cloud escalation (hard prompts) examples:
+- Complex semantic parsing: ambiguous ACs, multi-actor flows needing reasoning beyond rules.
+- Heuristic design: deriving edge cases for novel domains or intricate business constraints.
+- Code mapping suggestions: proposing resilient selector strategies or API payload constructions when mappings are missing.
+- Long-context synthesis: cross-story deduplication and consolidation across many artifacts.
+
+Routing rules:
+- Start local if flagged sensitive or volume>threshold; compute confidence (schema validity, consistency) and escalate if below threshold after N retries.
+- Always strip/redact secrets and PII before any cloud call.
+- Log provenance and routing decision; include in artifacts for audit.
 
 #### SCM & PR Policy
 - Auto-PR is allowed only when local run passes in the selected `executionMode` and docs-lint succeeds locally.

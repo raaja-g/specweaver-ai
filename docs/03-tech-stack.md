@@ -1,7 +1,7 @@
 ### Proposed Technology Stack
 
 - Core: Python 3.11+, pytest, Playwright, Jinja2, Pydantic
-- NLP/AI: Primary Groq (Llama 3.x variants), fallback Gemini 1.5, fallback Cursor CLI, fallback OpenAI; spaCy
+- NLP/AI: Primary Groq (Llama 3.x variants), fallback Gemini 1.5, fallback Cursor CLI, fallback OpenAI; Local open model via Ollama/vLLM (Llama 3.x) for hybrid; spaCy
 - Storage: Git, JSON/YAML artifacts, optional vector DB (FAISS/Chroma)
 - Reporting: Allure or pytest-html; CI: GitHub Actions; Docker for reproducibility
  - CLI: Typer
@@ -24,6 +24,7 @@
 - Playwright+pytest: reliable, parallel E2E with fixtures.
 - Jinja2+schemas: deterministic, maintainable codegen.
 - Groq first: fast, low-latency LLM inference for iterative parsing/generation.
+- Local open model: privacy-preserving and cost-efficient for sensitive/high-volume tasks.
 - Gemini fallback: strong reasoning and long-context support.
 - Cursor CLI fallback: leverages IDE-local capabilities when online providers fail.
 - OpenAI fallback: widely available, stable APIs.
