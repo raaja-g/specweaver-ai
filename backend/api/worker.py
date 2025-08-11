@@ -40,14 +40,79 @@ def _persist_run(run_id: str, record: Dict) -> None:
 
 
 def run_tests_job(run_id: str, session_id: str, ui_mode: str, api_mode: str, auto_pr: bool = False, requirement_id: str | None = None) -> Dict:
-    test_dir = Path("tests") / "approved" / session_id
+    import os
+    
+    # Use new functional structure: tests/{session_id}/
+    test_dir = Path("tests") / session_id
+    
+    # Get browser config from environment
+    browser = os.getenv("BROWSER", "chromium")
+    headless = os.getenv("HEADLESS", "false").lower() == "true"
+    timeout = os.getenv("BROWSER_TIMEOUT", "30000")
+    
+    # Build pytest command with proper browser configuration
+    # Create logs directory
+    logs_dir = Path("artifacts/logs")
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    
     cmd = [
         "pytest", str(test_dir),
-        "-q", "--tb=short",
+        "-v", "--tb=long",
+        "--capture=no",  # Show print statements
+        f"--browser={browser}",
+        f"--headless={headless}",
+        f"--timeout={timeout}",
         f"--ui-mode={ui_mode}",
-        f"--api-mode={api_mode}"
+        f"--api-mode={api_mode}",
+        "--alluredir=reports/allure-results",
+        f"--junitxml=reports/junit_{run_id}.xml",
+        f"--html=reports/report_{run_id}.html",
+        "--self-contained-html"
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    # Set environment variables for test execution
+    env = os.environ.copy()
+    env.update({
+        "UI_MODE": ui_mode,
+        "API_MODE": api_mode,
+        "BROWSER": browser,
+        "HEADLESS": str(headless),
+        "BROWSER_TIMEOUT": timeout
+    })
+    
+    # Create log file for this run
+    log_file = logs_dir / f"pytest_{run_id}.log"
+    
+    try:
+        # Run with output capture to both console and log file
+        with open(log_file, 'w') as f:
+            f.write(f"=== Test Execution Log for Run {run_id} ===\n")
+            f.write(f"Command: {' '.join(cmd)}\n")
+            f.write(f"Environment: UI_MODE={ui_mode}, API_MODE={api_mode}\n")
+            f.write("=" * 50 + "\n\n")
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=300)
+            
+            # Write output to log file
+            f.write("STDOUT:\n")
+            f.write(result.stdout)
+            f.write("\n\nSTDERR:\n")
+            f.write(result.stderr)
+            f.write(f"\n\nExit Code: {result.returncode}\n")
+    
+    except subprocess.TimeoutExpired:
+        result = type('Result', (), {
+            'returncode': -1, 
+            'stdout': 'Test execution timed out after 300 seconds', 
+            'stderr': 'Timeout'
+        })()
+    except Exception as e:
+        result = type('Result', (), {
+            'returncode': -2, 
+            'stdout': '', 
+            'stderr': f'Execution error: {str(e)}'
+        })()
+    
     record = {
         "id": run_id,
         "session_id": session_id,

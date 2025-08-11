@@ -18,7 +18,7 @@ class CodeSynthesizer:
     """Synthesize executable test code from test cases"""
     
     def __init__(self, 
-                 template_dir: str = "poc/templates",
+                 template_dir: str = "backend/core/templates",
                  orchestrator: Optional[LLMOrchestrator] = None):
         self.template_dir = Path(template_dir)
         self.env = Environment(
@@ -34,37 +34,118 @@ class CodeSynthesizer:
                    config: ExecutionConfig,
                    output_dir: Optional[Path] = None) -> Dict[str, Path]:
         """
-        Synthesize test code from test cases
+        Synthesize test code from test cases with proper functional organization
         
         Returns:
             Dict mapping file type to generated file path
         """
         output_dir = output_dir or Path("tests/generated")
-        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Organize by functional areas
+        features_dir = output_dir / "features"
+        steps_dir = output_dir / "steps"
+        
+        # Create functional subdirectories
+        functional_areas = self._identify_functional_areas(test_suite.test_cases)
+        for area in functional_areas:
+            (steps_dir / area).mkdir(parents=True, exist_ok=True)
+        
+        features_dir.mkdir(parents=True, exist_ok=True)
         
         generated_files = {}
         
-        # Generate feature file
-        feature_file = self._generate_feature(requirement, test_suite.test_cases, config, output_dir)
-        generated_files["feature"] = feature_file
+        # Generate feature files organized by functional area
+        for area in functional_areas:
+            area_tests = [tc for tc in test_suite.test_cases if self._get_functional_area(tc) == area]
+            if area_tests:
+                feature_file = self._generate_feature_by_area(requirement, area_tests, area, features_dir, config)
+                generated_files[f"feature_{area}"] = feature_file
+                
+                # Generate step definitions for this area
+                steps_file = self._generate_steps_by_area(requirement, area_tests, area, steps_dir / area, config)
+                generated_files[f"steps_{area}"] = steps_file
         
-        # Generate step definitions
-        steps_file = self._generate_steps(requirement, test_suite.test_cases, feature_file.name, output_dir)
-        generated_files["steps"] = steps_file
-        
-        # Generate or update locator repository
+        # Generate shared locator repository (not per-test)
         locator_file = self._generate_locators(test_suite.test_cases, output_dir)
         generated_files["locators"] = locator_file
         
-        # Generate conftest with fixtures
+        # Generate shared conftest (not per-test)
         conftest_file = self._generate_conftest(config, output_dir)
         generated_files["conftest"] = conftest_file
         
-        # Generate execution config
-        config_file = self._save_execution_config(config, output_dir)
-        generated_files["config"] = config_file
-        
         return generated_files
+    
+    def _identify_functional_areas(self, test_cases: List[TestCase]) -> List[str]:
+        """Identify functional areas from test cases"""
+        areas = set()
+        for test_case in test_cases:
+            area = self._get_functional_area(test_case)
+            areas.add(area)
+        return sorted(list(areas))
+    
+    def _get_functional_area(self, test_case: TestCase) -> str:
+        """Determine functional area from test case"""
+        title_lower = test_case.title.lower()
+        
+        if any(keyword in title_lower for keyword in ['search', 'find', 'browse', 'filter', 'catalog']):
+            return 'search'
+        elif any(keyword in title_lower for keyword in ['cart', 'add', 'remove', 'quantity', 'item']):
+            return 'cart'
+        elif any(keyword in title_lower for keyword in ['checkout', 'payment', 'order', 'billing', 'shipping']):
+            return 'checkout'
+        elif any(keyword in title_lower for keyword in ['login', 'register', 'auth', 'account', 'profile']):
+            return 'auth'
+        else:
+            # Default area for general tests
+            return 'general'
+    
+    def _generate_feature_by_area(self,
+                                 requirement: RequirementGraph,
+                                 test_cases: List[TestCase],
+                                 area: str,
+                                 features_dir: Path,
+                                 config: ExecutionConfig) -> Path:
+        """Generate feature file for specific functional area"""
+        template = self.env.get_template("feature.j2")
+        
+        content = template.render(
+            requirement=requirement,
+            test_cases=test_cases,
+            functional_area=area,
+            config=config,
+            timestamp=datetime.utcnow().isoformat()
+        )
+        
+        # Save feature file
+        feature_file = features_dir / f"{area}.feature"
+        feature_file.write_text(content)
+        logger.info(f"Generated {area} feature file: {feature_file}")
+        
+        return feature_file
+    
+    def _generate_steps_by_area(self,
+                               requirement: RequirementGraph,
+                               test_cases: List[TestCase],
+                               area: str,
+                               steps_dir: Path,
+                               config: ExecutionConfig) -> Path:
+        """Generate step definitions for specific functional area"""
+        template = self.env.get_template("pytest_steps.j2")
+        
+        content = template.render(
+            requirement=requirement,
+            test_cases=test_cases,
+            functional_area=area,
+            config=config,
+            timestamp=datetime.utcnow().isoformat()
+        )
+        
+        # Save steps file
+        steps_file = steps_dir / f"{area}_steps.py"
+        steps_file.write_text(content)
+        logger.info(f"Generated {area} steps file: {steps_file}")
+        
+        return steps_file
     
     def _generate_feature(self,
                          requirement: RequirementGraph,

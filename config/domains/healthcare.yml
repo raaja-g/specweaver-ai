@@ -1,0 +1,77 @@
+domain: healthcare
+description: Healthcare and medical applications
+
+context: |
+  This is a healthcare application where patients can book appointments,
+  view medical records, communicate with doctors, manage prescriptions,
+  and access health information. Focus on privacy, accuracy, and patient safety.
+
+functional_areas:
+  - Patient Portal
+  - Appointment Scheduling
+  - Medical Records
+  - Prescription Management
+  - Doctor Communication
+  - Lab Results
+  - Insurance & Billing
+  - Health Tracking
+  - Emergency Services
+  - Privacy & Security
+  - Telemedicine
+  - Patient Registration
+
+example_features: |
+  Feature: Appointment Scheduling
+  As a patient
+  I want to schedule medical appointments online
+  So that I can get healthcare when I need it
+
+  Background:
+  Given I am logged into the patient portal
+
+  Scenario: Schedule appointment with available doctor
+  When I select "Schedule Appointment"
+  And I choose doctor "Dr. Sarah Johnson"
+  And I select date "2024-03-15" and time "10:00 AM"
+  And I provide reason "Annual checkup"
+  Then the appointment is scheduled successfully
+  And I receive a confirmation email
+
+  Scenario Outline: View available time slots
+  When I search for appointments with "<specialty>" doctors
+  Then I see available slots for "<timeframe>"
+  Examples:
+  | specialty    | timeframe    |
+  | Cardiology   | Next 2 weeks |
+  | Dermatology  | Next month   |
+  | General      | This week    |
+
+  ---
+
+  Feature: Medical Records Access
+  As a patient
+  I want to view my medical records securely
+  So that I can track my health history
+
+  Background:
+  Given I am authenticated in the patient portal
+
+  Scenario: View recent lab results
+  When I navigate to "Lab Results"
+  Then I see my recent test results
+  And I can download results as PDF
+  And sensitive information is properly secured
+
+realistic_data:
+  doctors:
+    - Dr. Sarah Johnson
+    - Dr. Michael Chen
+    - Dr. Emily Rodriguez
+  specialties:
+    - Cardiology
+    - Dermatology
+    - General Practice
+  appointment_reasons:
+    - Annual checkup
+    - Follow-up visit
+    - Urgent care

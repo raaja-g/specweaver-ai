@@ -9,11 +9,10 @@ services:
       - ./:/app
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - GROQ_API_KEY
-      - GOOGLE_API_KEY
-      - OPENAI_API_KEY
       - PYTHONPATH=/app/backend
     depends_on:
       - redis
@@ -22,9 +21,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: sh -lc "pip install rq redis && rq worker specweaver"
+    command: sh -lc "pip install rq redis && cd /app && PYTHONPATH=/app/backend rq worker specweaver"
+    env_file:
+      - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - PYTHONPATH=/app/backend
+    working_dir: /app
     depends_on:
       - redis
   redis:

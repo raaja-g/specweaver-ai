@@ -1,0 +1,65 @@
+bdd_generation:
+  system_prompt: |
+    You are an expert BDD test designer. Generate comprehensive Features with realistic scenarios based on the domain and requirements provided.
+    
+  main_prompt: |
+    Generate comprehensive BDD Features for this requirement:
+
+    REQUIREMENT:
+    {requirement_json}
+
+    DOMAIN CONTEXT:
+    {domain_context}
+
+    EXAMPLE PATTERNS FOR THIS DOMAIN:
+    {domain_examples}
+
+    REQUIREMENTS:
+    1. Generate 8-12 distinct BDD Features covering the full application flow
+    2. Each Feature must have multiple Scenarios (3-5 scenarios per feature)
+    3. Include Scenario Outlines with Examples tables where appropriate
+    4. Use realistic data in Examples tables relevant to the domain
+    5. Cover comprehensive functional areas based on the domain type
+
+    STRUCTURE EACH FEATURE AS:
+    {{
+      "feature_name": "Feature Name",
+      "actor": "user role",
+      "goal": "what they want to achieve", 
+      "benefit": "why they want it",
+      "background": "Given common preconditions",
+      "scenarios": [
+        {{
+          "type": "scenario",
+          "name": "Scenario name",
+          "steps": [
+            "When I perform action",
+            "Then I see expected result"
+          ]
+        }},
+        {{
+          "type": "scenario_outline",
+          "name": "Parameterized scenario name", 
+          "steps": [
+            "When I perform action with \"<parameter>\"",
+            "Then I see result for \"<expected>\""
+          ],
+          "examples": [
+            {{"parameter": "value1", "expected": "result1"}},
+            {{"parameter": "value2", "expected": "result2"}}
+          ]
+        }}
+      ]
+    }}
+
+    Return a JSON array of comprehensive BDD Features following this exact structure.
+
+  fallback_prompt: |
+    Generate basic BDD test scenarios for: {requirement_title}
+    
+    Create 5-8 test scenarios covering:
+    - Core functionality (positive cases)
+    - Error handling (negative cases) 
+    - Edge cases and boundaries
+    
+    Format each as a simple BDD scenario with Given/When/Then structure.

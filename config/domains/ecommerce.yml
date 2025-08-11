@@ -1,0 +1,88 @@
+domain: ecommerce
+description: E-commerce and online shopping platforms
+
+context: |
+  This is an e-commerce website where users can browse products, manage shopping carts, 
+  make purchases, and manage their accounts. Focus on shopping flows, payment processing,
+  inventory management, and customer experience.
+
+functional_areas:
+  - Homepage & Global Navigation
+  - Search & Filters  
+  - Product Listing (PLP)
+  - Product Detail Page (PDP)
+  - Cart & Mini-cart
+  - Checkout Flow
+  - Account Management
+  - Order Management
+  - Payments & Billing
+  - Returns & Exchanges
+  - Promotions & Discounts
+  - Reviews & Ratings
+
+example_features: |
+  Feature: Homepage & Global Navigation
+  As a shopper
+  I want to land on the site and navigate globally
+  So that I can discover products and actions quickly
+
+  Background:
+  Given the site is available
+
+  Scenario: Render homepage for a first-time visitor
+  When I open the homepage
+  Then I see the cookie consent banner
+  And I see the primary navigation, search box, and featured banners
+
+  Scenario Outline: Navigate to category
+  When I select the "<category>" menu item
+  Then I land on the "<expected_page>" listing page
+  Examples:
+  | category      | expected_page |
+  | Men > Shoes   | Men Shoes     |
+  | Women > Dress | Women Dress   |
+
+  ---
+
+  Feature: Search
+  As a shopper
+  I want to search for products
+  So that I can quickly find relevant items
+
+  Background:
+  Given I am on any page with a search input
+
+  Scenario Outline: Execute keyword search
+  When I search for "<query>"
+  Then I see results relevant to "<query>"
+  And the total result count is displayed
+  Examples:
+  | query          |
+  | running shoes  |
+  | 128GB phone    |
+  | blue jeans     |
+
+  Scenario: No-results state
+  When I search for "zzzxxyy"
+  Then I see a friendly "no results" message
+  And I see recommendations to broaden my search
+
+realistic_data:
+  products:
+    - Nike Air Max 270
+    - iPhone 15 Pro
+    - Levi's 511 Jeans
+    - Samsung Galaxy S24
+    - Adidas Ultraboost 22
+  zip_codes:
+    - "10001"  # New York
+    - "90210"  # Beverly Hills
+    - "60601"  # Chicago
+  coupon_codes:
+    - WELCOME10
+    - SAVE20
+    - FREESHIP
+  categories:
+    - Men > Shoes
+    - Women > Dresses
+    - Electronics > Phones

@@ -62,6 +62,27 @@ class RequirementParser:
             parts["actor"] = match.group(1).strip()
             parts["goal"] = match.group(2).strip()
             parts["benefit"] = match.group(3).strip()
+        else:
+            # Handle free-form text - extract meaningful parts
+            if "test" in story.lower():
+                parts["actor"] = "tester"
+                if "ecommerce" in story.lower() or "commerce" in story.lower():
+                    parts["goal"] = "test the e-commerce website functionality"
+                    parts["benefit"] = "ensure the website works correctly for users"
+                elif "site" in story.lower() or "website" in story.lower():
+                    parts["goal"] = "test the website functionality"
+                    parts["benefit"] = "ensure the website meets quality standards"
+                else:
+                    parts["goal"] = "test the application"
+                    parts["benefit"] = "ensure quality and functionality"
+            elif "user" in story.lower():
+                parts["actor"] = "user"
+                parts["goal"] = "use the application"
+                parts["benefit"] = "accomplish their tasks"
+            else:
+                parts["actor"] = "user"
+                parts["goal"] = story.strip()
+                parts["benefit"] = "meet their requirements"
         
         # Extract acceptance criteria
         ac_section = re.search(r"Acceptance Criteria:?\s*(.+)", story, re.IGNORECASE | re.DOTALL)

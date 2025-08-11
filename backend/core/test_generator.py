@@ -8,6 +8,8 @@ import logging
 
 from .schemas import RequirementGraph, TestCase, TestStep, TestSuite
 from .llm_orchestrator import LLMOrchestrator
+from .domain_detector import DomainDetector
+from .prompt_loader import PromptLoader
 
 logger = logging.getLogger(__name__)
 
@@ -17,34 +19,25 @@ class TestCaseGenerator:
     
     def __init__(self, orchestrator: Optional[LLMOrchestrator] = None):
         self.orchestrator = orchestrator or LLMOrchestrator()
+        self.domain_detector = DomainDetector()
+        self.prompt_loader = PromptLoader()
         self.test_counter = 0
     
     def generate(self, 
                  requirement: RequirementGraph,
                  coverage: str = "comprehensive") -> TestSuite:
         """
-        Generate test cases from requirement
+        Generate comprehensive BDD Features with Scenarios from requirement
         
         Args:
             requirement: Parsed requirement graph
             coverage: "basic" or "comprehensive"
         """
-        test_cases = []
+        # Generate comprehensive BDD Features using LLM
+        features = self._generate_bdd_features(requirement, coverage)
         
-        # Generate positive test cases from acceptance criteria
-        for ac in requirement.acceptanceCriteria:
-            test_cases.extend(self._generate_from_ac(ac, requirement, "positive"))
-        
-        # Generate negative test cases
-        if coverage == "comprehensive":
-            test_cases.extend(self._generate_negative_cases(requirement))
-            test_cases.extend(self._generate_edge_cases(requirement))
-        
-        # Apply ECP/BVA heuristics
-        test_cases = self._apply_test_heuristics(test_cases, requirement)
-        
-        # Deduplicate
-        test_cases = self._deduplicate_cases(test_cases)
+        # Convert Features to TestCase format for compatibility
+        test_cases = self._convert_features_to_test_cases(features)
         
         # Calculate coverage metrics
         coverage_metrics = self._calculate_coverage(test_cases, requirement)
@@ -56,9 +49,172 @@ class TestCaseGenerator:
             generation_metadata={
                 "coverage_level": coverage,
                 "total_cases": len(test_cases),
-                "ac_coverage": coverage_metrics.get("ac_coverage", 0)
+                "ac_coverage": coverage_metrics.get("ac_coverage", 0),
+                "features_generated": len(features)
             }
         )
+    
+    def _generate_bdd_features(self, requirement: RequirementGraph, coverage: str) -> List[Dict[str, Any]]:
+        """Generate comprehensive BDD Features with Scenarios using LLM"""
+        
+        # Detect domain from requirement
+        ac_text = ' '.join([f"{ac.given} {ac.when} {ac.then}" for ac in requirement.acceptanceCriteria])
+        requirement_text = f"{requirement.title} {requirement.goal} {ac_text}"
+        url = getattr(requirement, 'url', '') or ''
+        domain = self.domain_detector.detect_domain(requirement_text, url)
+        
+        logger.info(f"Detected domain: {domain} for requirement: {requirement.title}")
+        
+        # Get domain-specific context
+        domain_context = self.domain_detector.get_domain_context(domain)
+        
+        # Load prompt template
+        prompt = self.prompt_loader.get_prompt(
+            'bdd_generation.main_prompt',
+            requirement_json=requirement.model_dump_json(indent=2),
+            domain_context=domain_context.get('context', ''),
+            domain_examples=domain_context.get('example_features', '')
+        )
+        
+        system_prompt = self.prompt_loader.get_prompt('bdd_generation.system_prompt') or \
+                       "You are an expert BDD test designer. Generate comprehensive Features with realistic scenarios."
+        
+        if not prompt:
+            logger.error("Failed to load BDD generation prompt template")
+            return self._generate_fallback_features(requirement)
+        
+        response = self.orchestrator.call(
+            prompt=prompt,
+            system=system_prompt,
+            task_type="bdd_generation"
+        )
+        
+        try:
+            features = json.loads(response.content)
+            return features if isinstance(features, list) else [features]
+        except Exception as e:
+            logger.error(f"Failed to parse BDD features: {e}")
+            return self._generate_fallback_features(requirement)
+    
+    def _generate_fallback_features(self, requirement: RequirementGraph) -> List[Dict[str, Any]]:
+        """Generate fallback BDD features when LLM fails"""
+        return [
+            {
+                "feature_name": "E-commerce Core Functionality",
+                "actor": "shopper",
+                "goal": "test the e-commerce website",
+                "benefit": "ensure all functionality works correctly",
+                "background": "Given I am on the e-commerce website",
+                "scenarios": [
+                    {
+                        "type": "scenario",
+                        "name": "Browse products successfully",
+                        "steps": [
+                            "When I navigate to the product catalog",
+                            "Then I see available products",
+                            "And I can view product details"
+                        ]
+                    },
+                    {
+                        "type": "scenario",
+                        "name": "Add product to cart",
+                        "steps": [
+                            "When I click 'Add to Cart' on a product",
+                            "Then the product is added to my cart",
+                            "And the cart count updates"
+                        ]
+                    },
+                    {
+                        "type": "scenario",
+                        "name": "Handle invalid actions gracefully",
+                        "steps": [
+                            "When I perform an invalid action",
+                            "Then I see appropriate error handling",
+                            "And the system remains stable"
+                        ]
+                    }
+                ]
+            }
+        ]
+    
+    def _convert_features_to_test_cases(self, features: List[Dict[str, Any]]) -> List[TestCase]:
+        """Convert BDD Features to TestCase format for compatibility"""
+        test_cases = []
+        
+        for feature in features:
+            feature_name = feature.get("feature_name", "Unknown Feature")
+            scenarios = feature.get("scenarios", [])
+            
+            for i, scenario in enumerate(scenarios):
+                self.test_counter += 1
+                scenario_name = scenario.get("name", f"Scenario {i+1}")
+                scenario_type = scenario.get("type", "scenario")
+                steps = scenario.get("steps", [])
+                
+                # Determine test type based on scenario content
+                test_type = "positive"
+                if any(word in scenario_name.lower() for word in ["invalid", "error", "fail", "negative"]):
+                    test_type = "negative"
+                elif any(word in scenario_name.lower() for word in ["edge", "boundary", "maximum", "minimum"]):
+                    test_type = "edge"
+                
+                # Create test steps
+                test_steps = []
+                for step in steps:
+                    # Parse step into action and params
+                    action = self._parse_step_to_action(step)
+                    test_steps.append(TestStep(action=action["action"], params=action["params"]))
+                
+                # Generate examples data if it's a scenario outline
+                examples_data = {}
+                if scenario_type == "scenario_outline" and "examples" in scenario:
+                    examples_data = {"examples": scenario["examples"]}
+                
+                test_case = TestCase(
+                    id=f"TC-{feature_name.replace(' ', '').replace('&', '').upper()[:8]}-{self.test_counter:03d}",
+                    title=f"{feature_name}: {scenario_name}",
+                    priority="P0" if test_type == "positive" else "P1" if test_type == "negative" else "P2",
+                    type=test_type,
+                    traceTo=["AC-1"],  # Link to first AC by default
+                    preconditions=[feature.get("background", "Given the system is ready")],
+                    steps=test_steps,
+                    data=examples_data,
+                    expected=[f"Scenario '{scenario_name}' completes successfully"],
+                    tags=[feature_name.lower().replace(" ", "_"), test_type, scenario_type]
+                )
+                test_cases.append(test_case)
+        
+        return test_cases
+    
+    def _parse_step_to_action(self, step: str) -> Dict[str, Any]:
+        """Parse BDD step into action and parameters"""
+        step_lower = step.lower()
+        
+        # Map common BDD steps to actions
+        if "click" in step_lower and "add to cart" in step_lower:
+            return {"action": "cart.add_item", "params": {"button": "Add to Cart"}}
+        elif "search for" in step_lower:
+            # Extract search query
+            import re
+            match = re.search(r'"([^"]*)"', step)
+            query = match.group(1) if match else "test query"
+            return {"action": "search.execute", "params": {"query": query}}
+        elif "navigate" in step_lower or "select" in step_lower:
+            return {"action": "navigation.goto", "params": {"target": step}}
+        elif "enter" in step_lower and ("zip" in step_lower or "postal" in step_lower):
+            match = re.search(r'"([^"]*)"', step)
+            zip_code = match.group(1) if match else "10001"
+            return {"action": "form.enter_zip", "params": {"zip": zip_code}}
+        elif "apply" in step_lower and "coupon" in step_lower:
+            match = re.search(r'"([^"]*)"', step)
+            coupon = match.group(1) if match else "WELCOME10"
+            return {"action": "cart.apply_coupon", "params": {"code": coupon}}
+        elif "set quantity" in step_lower:
+            match = re.search(r'(\d+)', step)
+            qty = int(match.group(1)) if match else 1
+            return {"action": "product.set_quantity", "params": {"quantity": qty}}
+        else:
+            return {"action": "user.action", "params": {"description": step}}
     
     def _generate_from_ac(self, 
                           ac: Any, 
@@ -97,8 +253,24 @@ class TestCaseGenerator:
         steps = []
         
         # Use LLM to break down the AC into steps
+        domain_examples = ""
+        if "ecommerce" in req.title.lower() or "commerce" in req.title.lower():
+            domain_examples = """
+E-COMMERCE SPECIFIC ACTIONS:
+- navigation.goto_page: {"url": "https://example.com/category/shoes"}
+- search.enter_query: {"query": "running shoes", "suggestions": true}
+- product.select_variant: {"attribute": "size", "value": "10.5"}
+- product.set_quantity: {"quantity": 2}
+- cart.add_item: {"sku": "NIKE-001", "quantity": 1}
+- cart.apply_coupon: {"code": "WELCOME10"}
+- checkout.enter_shipping: {"zip": "10001", "address": "123 Main St"}
+- payment.enter_card: {"type": "visa", "number": "4242****", "cvv": "123"}
+- order.place: {"confirmation": true}
+"""
+        
         prompt = f"""
-Break down this acceptance criteria into specific test steps:
+Break down this acceptance criteria into SPECIFIC, ACTIONABLE test steps:
+
 Given: {ac.given}
 When: {ac.when}
 Then: {ac.then}
@@ -106,8 +278,23 @@ Then: {ac.then}
 Context: {req.title}
 Domain: {req.domain or 'general'}
 
-Generate a list of semantic actions (e.g., login.enter_credentials, product.add_to_cart).
-Return as JSON array of steps with action and params.
+{domain_examples}
+
+REQUIREMENTS:
+1. Generate SPECIFIC actions with REAL parameters (not placeholders)
+2. Use realistic data (ZIP codes: 10001, 90210; SKUs: NIKE-AIR-001; emails: user@example.com)
+3. Each action should be executable and testable
+4. Include validation steps where appropriate
+
+EXAMPLE OUTPUT:
+[
+  {{"action": "navigation.goto_category", "params": {{"category": "men-shoes", "url": "/category/men/shoes"}}}},
+  {{"action": "product.select_variant", "params": {{"attribute": "size", "value": "10.5"}}}},
+  {{"action": "cart.add_item", "params": {{"sku": "NIKE-AIR-MAX-001", "quantity": 1}}}},
+  {{"action": "cart.verify_contents", "params": {{"expected_items": 1, "expected_total": "$129.99"}}}}
+]
+
+Return ONLY the JSON array of specific, actionable steps.
 """
         
         response = self.orchestrator.call(
@@ -291,11 +478,26 @@ Return as JSON array of steps with action and params.
         unique = []
         
         for case in cases:
-            # Create signature from steps and data
+            # Create signature from steps and data (handle nested dicts)
+            data_signature = []
+            if isinstance(case.data, dict):
+                try:
+                    # Flatten nested dicts to avoid unhashable issues
+                    flat_data = {}
+                    for k, v in case.data.items():
+                        if isinstance(v, dict):
+                            flat_data[k] = str(v)  # Convert nested dicts to strings
+                        else:
+                            flat_data[k] = v
+                    data_signature = tuple(sorted(flat_data.items()))
+                except Exception:
+                    # Fallback: use string representation
+                    data_signature = str(case.data)
+            
             signature = (
                 case.type,
                 tuple(step.action for step in case.steps),
-                tuple(sorted(case.data.items()) if isinstance(case.data, dict) else [])
+                data_signature
             )
             
             if signature not in seen:
