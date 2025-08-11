@@ -29,6 +29,7 @@
  - API tests: generate HTTPX-based step defs with contract checks (status, schema via OpenAPI) and response examples.
  - UI tests: generate Playwright step defs referencing locator repo; add self-healing suggestions recorded in artifacts when selectors fail.
  - Storage: after approval, commit generated features/steps/tests to repo structure automatically with metadata (traceability, versions).
+ - Auto-PR: on successful local execution (all tests green in selected mode), automatically create a feature branch, commit artifacts, and open a PR with links to reports and metrics. Triggers: UI click, MCP tool, or n8n workflow completion.
 
 #### Maintainability & Scalability
 - Versioned schemas & prompts; governed locator updates.

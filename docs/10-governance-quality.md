@@ -31,3 +31,8 @@
 - Agent roles have explicit contracts and metrics (success, latency, escalation rate).
 - Handoffs are logged with context; failures trigger fallback or human escalation in n8n.
 - Workflows are versioned; only approved versions run in CI.
+
+#### SCM & PR Policy
+- Auto-PR is allowed only when local run passes in the selected `executionMode` and docs-lint succeeds locally.
+- Branch naming: `feature/tests/<story-id>-<slug>`; PR includes links to Allure report and artifacts.
+- Require at least one reviewer and the docs-lint workflow to pass before merge.

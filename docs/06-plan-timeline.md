@@ -16,6 +16,7 @@ Phase 3 (Days 4–5):
 - Reuse-first scanner across existing tests; configurable override.
 - Self-healing proposal engine and artifact outputs.
  - n8n hardening: idempotency, retries, and run history persisted.
+ - Auto-PR pipeline: branch naming, commit strategy, PR template, and status checks wiring.
 
 Phase 4 (Day 6+):
 - Scalability and resilience: background workers, retries, observability.

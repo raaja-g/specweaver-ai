@@ -10,7 +10,7 @@
 - Governance Agent: enforces policies (reuse-first, mode discipline), collects provenance, and requests HIL approvals.
 
 #### n8n Workflow Sketch
-- Trigger (API/UI webhook) → Parser → Designer → Reuse Scanner → HIL Approval (manual node) → Synthesizer → Commit → Runner → Metrics Ingest → Dashboard update.
+- Trigger (API/UI webhook/MCP tool) → Parser → Designer → Reuse Scanner → HIL Approval (manual node) → Synthesizer → Local Run (mock|stub|real) → If PASS then Commit + Auto-PR → Runner (CI) → Metrics Ingest → Dashboard update.
 - Error branches: fallback to next LLM provider; human escalation on repeated schema violations.
 
 #### Integration Points

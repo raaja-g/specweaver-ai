@@ -118,6 +118,7 @@ flowchart LR
   end
 
   subgraph External
+    SCM["Git Hosting\n(GitHub/GitLab)"]
     GROQ["Groq API"]
     GEM["Gemini API"]
     CUR["Cursor CLI"]
@@ -129,6 +130,7 @@ flowchart LR
   API <--> GIT
   API <--> RPT
   API <--> N8N
+  API --> SCM
 
   MCPClient <--> MCPS
   MCPS --> CORE
@@ -136,6 +138,8 @@ flowchart LR
   CORE <--> GIT
   CORE <--> RPT
   CORE <--> N8N
+  CORE --> SCM
+  N8N --> SCM
   ORCH --> GROQ
   ORCH --> GEM
   ORCH --> CUR
