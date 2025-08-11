@@ -22,13 +22,13 @@ Phase 4 (Day 6+):
 - Scalability and resilience: background workers, retries, observability.
 - Advanced metrics: mutation score (API), selector confidence, time-to-green SLA.
 
-#### Decisions to Confirm
-- Domain/flows (checkout vs alternative).
-- Cloud vs local LLM.
-- Coverage level for POC (basic/comprehensive).
-- Target demo environment.
- - Execution mode default: `mock|stub|real`.
- - Self-healing level: propose-only vs auto-apply behind review.
- - Reuse scope: which existing tests repos to scan and map.
- - Web UI stack: FastAPI full-stack (server-rendered) vs SPA (React) + API.
- - Results store: file-based Allure JSON vs DB-backed metrics.
+#### Decisions (confirmed)
+- Domain/flows: Domain and workflow agnostic (use Domain Packs optionally).
+- LLM: Cloud LLMs with fallback order Groq → Gemini → Cursor CLI → OpenAI.
+- Coverage level for POC: comprehensive.
+- Target demo environment (UI): https://luma.enablementadobe.com/content/luma/us/en.html
+- Default execution mode: API=mock, UI=real.
+- Self-healing: auto-apply behind review (apply after approval with diff).
+- Reuse scope: scan this repository’s test structure first; reuse preferred in-place.
+- Web UI stack: FastAPI backend + React (SPA) frontend.
+- Results store: file-based Allure JSON for current runs + DB-backed metrics for trends.
