@@ -13,14 +13,14 @@ from datetime import datetime
 import logging
 import sys
 
-# Add poc to path
-sys.path.append(str(Path(__file__).parent.parent / "poc"))
+# Add backend core to path
+sys.path.append(str(Path(__file__).parent.parent / "core"))
 
-from poc.schemas import RequirementGraph, TestSuite, ExecutionConfig
-from poc.llm_orchestrator import LLMOrchestrator
-from poc.requirement_parser import RequirementParser
-from poc.test_generator import TestCaseGenerator
-from poc.code_synthesizer import CodeSynthesizer
+from core.schemas import RequirementGraph, TestSuite, ExecutionConfig
+from core.llm_orchestrator import LLMOrchestrator
+from core.requirement_parser import RequirementParser
+from core.test_generator import TestCaseGenerator
+from core.code_synthesizer import CodeSynthesizer
 
 # Setup
 app = FastAPI(title="SpecWeaver API", version="1.0.0")

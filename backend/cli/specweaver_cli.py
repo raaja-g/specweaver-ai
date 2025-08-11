@@ -11,11 +11,11 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import track
 
-from schemas import ExecutionConfig
-from llm_orchestrator import LLMOrchestrator, LLMProvider
-from requirement_parser import RequirementParser  
-from test_generator import TestCaseGenerator
-from code_synthesizer import CodeSynthesizer
+from backend.core.schemas import ExecutionConfig, RequirementGraph, TestSuite
+from backend.core.llm_orchestrator import LLMOrchestrator, LLMProvider
+from backend.core.requirement_parser import RequirementParser  
+from backend.core.test_generator import TestCaseGenerator
+from backend.core.code_synthesizer import CodeSynthesizer
 
 # Setup
 app = typer.Typer(help="SpecWeaver - Automated Test Generation from Requirements")
@@ -75,7 +75,6 @@ def generate(
     console.print(f"[bold blue]Generating test cases:[/bold blue] {requirement}")
     
     # Load requirement
-    from schemas import RequirementGraph
     req_data = json.loads(requirement.read_text())
     req = RequirementGraph(**req_data)
     
@@ -121,7 +120,6 @@ def synthesize(
     console.print(f"[bold blue]Synthesizing test code:[/bold blue]")
     
     # Load inputs
-    from schemas import RequirementGraph, TestSuite
     req_data = json.loads(requirement.read_text())
     req = RequirementGraph(**req_data)
     
@@ -209,7 +207,6 @@ def validate(
     console.print("[bold blue]Validating artifacts...[/bold blue]")
     
     # Load artifacts
-    from schemas import RequirementGraph, TestSuite
     req_data = json.loads(requirement.read_text())
     req = RequirementGraph(**req_data)
     
