@@ -67,13 +67,37 @@
       }
     },
     {
-      "id": "auto_pr",
-      "name": "Auto PR",
+      "id": "poll",
+      "name": "Poll Run Until Done",
       "type": "n8n-nodes-base.httpRequest",
       "parameters": {
         "url": "=http://api:8080/api/runs/{{$json[\"run_id\"]}}",
         "method": "GET"
       }
+    },
+    {
+      "id": "if_pass",
+      "name": "If Passed",
+      "type": "n8n-nodes-base.if",
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{$json.status}}", "operation": "equal", "value2": "completed" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "noop",
+      "name": "No PR",
+      "type": "n8n-nodes-base.noOp",
+      "parameters": {}
+    },
+    {
+      "id": "auto_pr",
+      "name": "Auto PR (already triggered by API if auto_pr)",
+      "type": "n8n-nodes-base.noOp",
+      "parameters": {}
     }
   ],
   "connections": {
@@ -82,6 +106,8 @@
     "generate": ["manual"],
     "manual": ["approve"],
     "approve": ["run"],
-    "run": ["auto_pr"]
+    "run": ["poll"],
+    "poll": ["if_pass"],
+    "if_pass": ["auto_pr", "noop"]
   }
 }

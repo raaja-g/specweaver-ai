@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Bar, Line } from 'react-chartjs-2';
+import hljs from 'highlight.js/lib/core';
+import diffLang from 'highlight.js/lib/languages/diff';
+import 'highlight.js/styles/atom-one-dark.css';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -31,6 +34,10 @@ export default function App() {
   const [allowDup, setAllowDup] = useState<boolean>(false);
   const [diffs, setDiffs] = useState<any[] | null>(null);
   const [showDiffs, setShowDiffs] = useState<boolean>(false);
+
+  useEffect(() => {
+    hljs.registerLanguage('diff', diffLang);
+  }, []);
 
   const api = 'http://localhost:8080';
 
@@ -235,8 +242,8 @@ export default function App() {
                   diffs.map((d, i) => (
                     <div key={i} style={{ marginBottom: 16 }}>
                       <div><b>{d.type}</b> {d.exists ? '(update)' : '(new)'} — {d.preview_path}</div>
-                      <pre style={{ whiteSpace: 'pre-wrap', background: '#0f172a', color: '#e2e8f0', padding: 8 }}>
-                        {d.diff || 'No existing file to diff'}
+                      <pre style={{ background: '#0f172a', color: '#e2e8f0', padding: 8, overflow: 'auto' }}>
+                        <code className="language-diff" dangerouslySetInnerHTML={{ __html: hljs.highlight(d.diff || 'No existing file to diff', { language: 'diff' }).value }} />
                       </pre>
                     </div>
                   ))
