@@ -1,0 +1,20 @@
+{
+  "name": "SpecWeaver Test Generation",
+  "nodes": [
+    {"id":"1","name":"Webhook Start","type":"n8n-nodes-base.webhook"},
+    {"id":"2","name":"Parse Requirement","type":"custom.parseRequirement"},
+    {"id":"3","name":"Generate Tests","type":"custom.generateTests"},
+    {"id":"4","name":"Manual Approval","type":"n8n-nodes-base.wait"},
+    {"id":"5","name":"Synthesize","type":"custom.synthesize"},
+    {"id":"6","name":"Local Run","type":"custom.runLocal"},
+    {"id":"7","name":"Auto PR","type":"custom.autoPr"}
+  ],
+  "connections": {
+    "1": ["2"],
+    "2": ["3"],
+    "3": ["4"],
+    "4": ["5"],
+    "5": ["6"],
+    "6": ["7"]
+  }
+}
