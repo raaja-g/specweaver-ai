@@ -45,8 +45,8 @@ ARTIFACTS_DIR = Path("artifacts")
 ARTIFACTS_DIR.mkdir(exist_ok=True)
 
 # In-memory store (would use Redis/DB in production)
-sessions = {}
-test_runs = {}
+sessions: Dict[str, Any] = {}
+test_runs: Dict[str, Any] = {}
 RUNS_FILE = ARTIFACTS_DIR / "run_status.json"
 
 
@@ -78,6 +78,19 @@ def _load_runs() -> None:
             logger.exception("Failed to load run status")
 
 
+def _append_metrics(summary: Dict[str, Any]) -> None:
+    metrics_file = ARTIFACTS_DIR / "metrics.json"
+    try:
+        if metrics_file.exists():
+            arr = json.loads(metrics_file.read_text())
+        else:
+            arr = []
+        arr.append(summary)
+        metrics_file.write_text(json.dumps(arr, indent=2))
+    except Exception:
+        logger.exception("Failed to append metrics")
+
+
 class RequirementUpload(BaseModel):
     """Request to upload/parse requirement"""
     story_text: str
@@ -90,6 +103,7 @@ class GenerateRequest(BaseModel):
     requirement_id: str
     coverage: str = "comprehensive"
     domain_pack: Optional[str] = None
+    allow_duplicates: bool = False
 
 
 class ApprovalRequest(BaseModel):
@@ -98,6 +112,7 @@ class ApprovalRequest(BaseModel):
     test_case_ids: List[str]
     approved: bool
     notes: Optional[str] = None
+    allow_duplicates: bool = False
 
 
 class RunRequest(BaseModel):
@@ -106,6 +121,7 @@ class RunRequest(BaseModel):
     ui_mode: str = "real"
     api_mode: str = "mock"
     tags: Optional[List[str]] = []
+    auto_pr: bool = False
 
 
 @app.get("/")
@@ -177,6 +193,17 @@ async def generate_test_cases(session_id: str, req: GenerateRequest):
         suite_file = ARTIFACTS_DIR / session_id / "test_cases.json"
         suite_file.write_text(test_suite.model_dump_json(indent=2))
         
+        # Reuse scan
+        duplicates: List[Dict[str, Any]] = []
+        try:
+            from core.utils.reuse_scanner import find_equivalent_tests
+            duplicates = find_equivalent_tests(suite_file, Path("tests"))
+        except Exception:
+            logger.exception("Reuse scan failed")
+
+        if duplicates and not req.allow_duplicates:
+            raise HTTPException(status_code=409, detail={"duplicates": duplicates})
+
         # Update session
         sessions[session_id]["test_suite"] = test_suite
         sessions[session_id]["status"] = "generated"
@@ -194,7 +221,8 @@ async def generate_test_cases(session_id: str, req: GenerateRequest):
                     "trace_to": tc.traceTo
                 }
                 for tc in test_suite.test_cases
-            ]
+            ],
+            "duplicates": duplicates
         }
     except Exception as e:
         logger.error(f"Failed to generate test cases: {e}")
@@ -221,6 +249,23 @@ async def approve_tests(session_id: str, req: ApprovalRequest):
         if not approved_cases:
             raise HTTPException(status_code=400, detail="No test cases to approve")
         
+        # Reuse scan on approved set
+        approved_suite_path = ARTIFACTS_DIR / session_id / "approved_test_cases.json"
+        approved_suite_json = {
+            "requirement_id": requirement.id,
+            "test_cases": [tc.model_dump() for tc in test_suite.test_cases if tc.id in req.test_case_ids]
+        }
+        (ARTIFACTS_DIR / session_id).mkdir(exist_ok=True)
+        approved_suite_path.write_text(json.dumps(approved_suite_json, indent=2))
+        duplicates: List[Dict[str, Any]] = []
+        try:
+            from core.utils.reuse_scanner import find_equivalent_tests
+            duplicates = find_equivalent_tests(approved_suite_path, Path("tests"))
+        except Exception:
+            logger.exception("Reuse scan failed on approval")
+        if duplicates and not req.allow_duplicates:
+            raise HTTPException(status_code=409, detail={"duplicates": duplicates})
+
         # Generate code for approved tests
         config = ExecutionConfig()
         synthesizer = CodeSynthesizer()
@@ -238,7 +283,8 @@ async def approve_tests(session_id: str, req: ApprovalRequest):
             "session_id": session_id,
             "approved_count": len(approved_cases),
             "generated_files": list(generated_files.keys()),
-            "test_directory": str(test_dir)
+            "test_directory": str(test_dir),
+            "duplicates": duplicates
         }
     except Exception as e:
         logger.error(f"Failed to approve tests: {e}")
@@ -259,6 +305,8 @@ async def run_tests(req: RunRequest, background_tasks: BackgroundTasks):
         "session_id": req.session_id,
         "ui_mode": req.ui_mode,
         "api_mode": req.api_mode,
+        "auto_pr": req.auto_pr,
+        "requirement_id": sessions[req.session_id]["requirement"].id if req.session_id in sessions else None,
         "status": "queued",
         "created_at": datetime.utcnow()
     }
@@ -271,7 +319,8 @@ async def run_tests(req: RunRequest, background_tasks: BackgroundTasks):
 
             conn = redis.from_url(os.getenv("REDIS_URL"))
             q = Queue("specweaver", connection=conn, default_timeout=3600)
-            q.enqueue("backend.api.worker.run_tests_job", run_id, req.session_id, req.ui_mode, req.api_mode)
+            job = q.enqueue("backend.api.worker.run_tests_job", run_id, req.session_id, req.ui_mode, req.api_mode, req.auto_pr, test_runs[run_id]["requirement_id"])
+            test_runs[run_id]["job_id"] = job.id
         except Exception:
             logger.exception("RQ enqueue failed, falling back to BackgroundTasks")
             background_tasks.add_task(execute_tests, run_id, req)
@@ -314,6 +363,23 @@ async def execute_tests(run_id: str, req: RunRequest):
         test_runs[run_id]["errors"] = result.stderr
         test_runs[run_id]["exit_code"] = result.returncode
         _save_runs()
+
+        # Append metrics summary
+        _append_metrics({
+            "run_id": run_id,
+            "session_id": req.session_id,
+            "status": test_runs[run_id]["status"],
+            "created_at": _serialize_run(test_runs[run_id])["created_at"],
+            "completed_at": _serialize_run(test_runs[run_id]).get("completed_at"),
+        })
+
+        # Auto-PR on pass
+        if test_runs[run_id]["status"] == "completed" and test_runs[run_id].get("auto_pr"):
+            try:
+                story_id = test_runs[run_id].get("requirement_id") or req.session_id
+                subprocess.run(["bash", "scripts/auto_pr.sh", str(story_id)], check=False)
+            except Exception:
+                logger.exception("Auto-PR script failed")
     except Exception as e:
         test_runs[run_id]["status"] = "error"
         test_runs[run_id]["error"] = str(e)
@@ -326,6 +392,26 @@ async def get_run_status(run_id: str):
     if run_id not in test_runs:
         raise HTTPException(status_code=404, detail="Run not found")
     
+    return test_runs[run_id]
+
+
+@app.post("/api/runs/{run_id}/refresh")
+async def refresh_run_status(run_id: str):
+    """Refresh run status from artifacts/run_status.json (for RQ worker updates)"""
+    if not RUNS_FILE.exists() or run_id not in test_runs:
+        return test_runs.get(run_id, {"id": run_id, "status": "unknown"})
+    try:
+        data = json.loads(RUNS_FILE.read_text())
+        if run_id in data:
+            for ts in ["created_at", "started_at", "completed_at"]:
+                if data[run_id].get(ts):
+                    try:
+                        data[run_id][ts] = datetime.fromisoformat(data[run_id][ts])
+                    except Exception:
+                        pass
+            test_runs[run_id].update(data[run_id])
+    except Exception:
+        logger.exception("Failed to refresh run status")
     return test_runs[run_id]
 
 
