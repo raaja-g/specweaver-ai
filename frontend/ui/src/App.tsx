@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -29,6 +29,8 @@ export default function App() {
   const [runStatus, setRunStatus] = useState<any>(null);
   const [metrics, setMetrics] = useState<any>(null);
   const [allowDup, setAllowDup] = useState<boolean>(false);
+  const [diffs, setDiffs] = useState<any[] | null>(null);
+  const [showDiffs, setShowDiffs] = useState<boolean>(false);
 
   const api = 'http://localhost:8080';
 
@@ -60,12 +62,42 @@ export default function App() {
   const approve = async () => {
     if (!session) return;
     const ids = tests.filter(t => selected[t.id]).map(t => t.id);
+    // Request preview diffs first
+    try {
+      const pv = await axios.post(`${api}/api/requirements/${session}/preview`, { test_case_ids: ids });
+      setDiffs(pv.data.diffs || []);
+      setShowDiffs(true);
+      return;
+    } catch (e) {
+      // fallback to immediate approve if preview not available
+    }
     try {
       await axios.post(`${api}/api/requirements/${session}/approve`, {
         test_case_ids: ids,
         approved: true,
         allow_duplicates: allowDup,
       });
+      alert('Approved and generated tests.');
+    } catch (e: any) {
+      if (e.response?.status === 409) {
+        setDuplicates(e.response.data.detail?.duplicates || []);
+        alert('Duplicate tests found. Enable Allow duplicates or change selection.');
+      } else {
+        alert('Approve failed');
+      }
+    }
+  };
+
+  const confirmApprove = async () => {
+    if (!session) return;
+    const ids = tests.filter(t => selected[t.id]).map(t => t.id);
+    try {
+      await axios.post(`${api}/api/requirements/${session}/approve`, {
+        test_case_ids: ids,
+        approved: true,
+        allow_duplicates: allowDup,
+      });
+      setShowDiffs(false);
       alert('Approved and generated tests.');
     } catch (e: any) {
       if (e.response?.status === 409) {
@@ -131,6 +163,18 @@ export default function App() {
     };
   }, [metrics]);
 
+  const timeSeries = useMemo(() => {
+    if (!metrics?.history) return { labels: [], datasets: [] };
+    const labels = metrics.history.map((m: any) => (m.completed_at || m.created_at || '').slice(11, 19));
+    const data = metrics.history.map((m: any) => (m.status === 'completed' ? 1 : 0));
+    return {
+      labels,
+      datasets: [
+        { label: 'Pass (1=yes)', data, borderColor: 'rgba(16,185,129,1)', backgroundColor: 'rgba(16,185,129,0.2)' },
+      ],
+    };
+  }, [metrics]);
+
   return (
     <div style={{ padding: 24, fontFamily: 'Inter, system-ui, Arial' }}>
       <h1>SpecWeaver</h1>
@@ -183,6 +227,30 @@ export default function App() {
           </div>
           <button onClick={approve} disabled={!tests.length} style={{ marginTop: 8 }}>3) Approve Selected</button>
 
+          {showDiffs && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: '80%', maxHeight: '80%', overflow: 'auto', background: 'white', padding: 16, borderRadius: 8 }}>
+                <h3>Preview diffs</h3>
+                {diffs?.length ? (
+                  diffs.map((d, i) => (
+                    <div key={i} style={{ marginBottom: 16 }}>
+                      <div><b>{d.type}</b> {d.exists ? '(update)' : '(new)'} — {d.preview_path}</div>
+                      <pre style={{ whiteSpace: 'pre-wrap', background: '#0f172a', color: '#e2e8f0', padding: 8 }}>
+                        {d.diff || 'No existing file to diff'}
+                      </pre>
+                    </div>
+                  ))
+                ) : (
+                  <div>No diffs available</div>
+                )}
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button onClick={() => setShowDiffs(false)}>Cancel</button>
+                  <button onClick={confirmApprove}>Confirm Approve</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <h3 style={{ marginTop: 16 }}>Run</h3>
           <div>
             <label>UI Mode: </label>
@@ -215,6 +283,9 @@ export default function App() {
           <h3>Dashboard</h3>
           <div style={{ height: 300 }}>
             <Bar data={chartData as any} options={{ responsive: true, plugins: { legend: { display: false }, title: { display: true, text: 'Current Run Distribution' } } }} />
+          </div>
+          <div style={{ height: 240, marginTop: 12 }}>
+            <Line data={timeSeries as any} options={{ responsive: true, plugins: { legend: { display: true }, title: { display: true, text: 'Pass Trend (recent runs)' } } }} />
           </div>
           <div style={{ marginTop: 8 }}>Pass rate: {metrics?.pass_rate?.toFixed?.(1) ?? 0}%</div>
         </div>

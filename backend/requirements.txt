@@ -8,3 +8,6 @@ pytest-bdd
 httpx
 uvicorn
 fastapi
+anyio
+websockets
+mcp
