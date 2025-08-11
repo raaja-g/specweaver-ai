@@ -7,3 +7,20 @@ __pycache__/
 node_modules/
 reports/
 artifacts/
+venv/
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Node
+frontend/ui/node_modules/
+frontend/ui/dist/
+
+# OS
+.DS_Store
+
+# Artifacts
+artifacts/
+reports/
