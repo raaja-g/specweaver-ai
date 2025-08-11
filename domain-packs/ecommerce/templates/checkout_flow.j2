@@ -1,0 +1,65 @@
+Feature: Checkout Flow - {{ requirement.title }}
+  As a {{ requirement.actor }}
+  I want to {{ requirement.goal }}
+  So that {{ requirement.benefit }}
+
+  Background:
+    Given the e-commerce application is running
+    And I have items in my cart
+    And the checkout process is available
+
+  {% for test_case in test_cases %}
+  Scenario: {{ test_case.title }}
+    {% for step in test_case.steps %}
+    {{ step.keyword }} {{ step.text }}
+    {% endfor %}
+    
+    # E-commerce specific checkout validations
+    Then the order summary should display correct totals
+    And the shipping options should be available
+    And the payment methods should be displayed
+    And the order confirmation should be generated
+    And the inventory should be reserved
+    And the cart should be cleared after successful checkout
+  
+  {% endfor %}
+
+  Scenario: Guest Checkout Flow
+    Given I am not logged in
+    And I have items in my cart
+    When I proceed to checkout
+    Then I should see guest checkout options
+    And I should be able to enter shipping information
+    And I should be able to enter billing information
+    And I should be able to select payment method
+    When I complete the checkout process
+    Then the order should be created successfully
+    And I should receive an order confirmation
+
+  Scenario: Registered User Checkout
+    Given I am logged in as a registered user
+    And I have saved addresses and payment methods
+    When I proceed to checkout
+    Then my saved information should be pre-populated
+    And I should be able to modify shipping address
+    And I should be able to select from saved payment methods
+    When I complete the checkout process
+    Then the order should be associated with my account
+    And the order should appear in my order history
+
+  Scenario Outline: Checkout with Different Payment Methods
+    Given I have items worth "<order_total>" in my cart
+    When I proceed to checkout
+    And I select "<payment_method>" as payment method
+    And I enter valid payment details
+    And I submit the order
+    Then the payment should be processed via "<payment_processor>"
+    And the order status should be "<expected_status>"
+    And I should receive appropriate confirmation
+
+    Examples:
+      | order_total | payment_method | payment_processor | expected_status |
+      | $25.99      | credit_card    | stripe           | confirmed       |
+      | $150.00     | paypal         | paypal           | confirmed       |
+      | $75.50      | apple_pay      | stripe           | confirmed       |
+      | $99.99      | google_pay     | stripe           | confirmed       |

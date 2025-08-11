@@ -1,0 +1,39 @@
+Feature: Add Product to Cart - Success Path
+  As a {{ requirement.actor }}
+  I want to {{ requirement.goal }}
+  So that {{ requirement.benefit }}
+
+  Background:
+    Given the e-commerce application is running
+    And I am on the product catalog page
+    And there are products available with inventory
+
+  {% for test_case in test_cases %}
+  Scenario: {{ test_case.title }}
+    {% for step in test_case.steps %}
+    {{ step.keyword }} {{ step.text }}
+    {% endfor %}
+    
+    # Domain-specific validations
+    Then the cart should show the correct item count
+    And the cart subtotal should be calculated correctly
+    And the product inventory should be decremented
+    And the cart persistence should be maintained across sessions
+  
+  {% endfor %}
+
+  Scenario Outline: Add Different Product Types to Cart
+    Given I am viewing a "<product_type>" product
+    And the product has "<inventory_status>" inventory
+    When I click the "Add to Cart" button
+    And I specify quantity "<quantity>"
+    Then the product should be added to cart successfully
+    And the cart total should reflect the correct amount
+    And the inventory should be updated appropriately
+
+    Examples:
+      | product_type | inventory_status | quantity |
+      | physical     | in_stock        | 1        |
+      | digital      | unlimited       | 1        |
+      | bundle       | limited         | 2        |
+      | subscription | available       | 1        |

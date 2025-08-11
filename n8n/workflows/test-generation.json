@@ -1,20 +1,37 @@
 {
   "name": "SpecWeaver Test Generation",
+  "active": false,
   "nodes": [
-    {"id":"webhook","name":"Webhook Start","type":"n8n-nodes-base.webhook"},
-    {"id":"parse","name":"Parse Requirement","type":"custom.parseRequirement"},
-    {"id":"gen","name":"Generate Tests","type":"custom.generateTests"},
-    {"id":"hil","name":"Manual Approval","type":"n8n-nodes-base.wait"},
-    {"id":"syn","name":"Synthesize","type":"custom.synthesize"},
-    {"id":"run","name":"Local Run","type":"custom.runLocal"},
-    {"id":"pr","name":"Auto PR","type":"custom.autoPr"}
+    {
+      "parameters": {
+        "path": "specweaver/ingest",
+        "responseMode": "onReceived"
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [280, 160]
+    },
+    {
+      "parameters": {
+        "url": "http://api:8080/api/requirements",
+        "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "jsonParameters": true,
+        "bodyParametersJson": "={ \"story_text\": $json[\"story_text\"] }"
+      },
+      "id": "ParseRequirement",
+      "name": "Parse Requirement",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [560, 160]
+    }
   ],
   "connections": {
-    "webhook": ["parse"],
-    "parse": ["gen"],
-    "gen": ["hil"],
-    "hil": ["syn"],
-    "syn": ["run"],
-    "run": ["pr"]
+    "Webhook": {
+      "main": [ [ { "node": "Parse Requirement", "type": "main", "index": 0 } ] ]
+    }
   }
 }

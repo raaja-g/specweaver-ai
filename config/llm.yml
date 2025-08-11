@@ -1,0 +1,11 @@
+version: "1.0"
+models:
+  local: llama3.2            # Ollama/vLLM local model
+  groq: compound-beta        # Groq hosted model (requested)
+  gemini: gemini-2.5-pro     # Google Gemini model
+  openai: gpt-4.1-nano        # OpenAI model
+
+routing:
+  enable_local: false
+  order: [groq, gemini, openai]
+

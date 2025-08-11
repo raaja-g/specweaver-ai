@@ -1,0 +1,311 @@
+---
+# Luma Demo Site Locator Repository
+# Target: https://luma.enablementadobe.com/content/luma/us/en.html
+
+metadata:
+  generated_at: "2024-01-15T10:30:00Z"
+  target_url: "https://luma.enablementadobe.com/content/luma/us/en.html"
+  version: "1.0.0"
+  description: "Locators for Luma e-commerce demo site"
+
+pages:
+  homepage:
+    # Navigation elements
+    main_logo:
+      primary: ".logo img[alt*='Luma']"
+      fallback: "a[href*='home'] img"
+      xpath: "//img[contains(@alt, 'Luma')]"
+      description: "Main Luma logo in header"
+      
+    search_box:
+      primary: "#search"
+      fallback: "input[placeholder*='Search']"
+      xpath: "//input[@id='search' or contains(@placeholder, 'Search')]"
+      description: "Main search input field"
+      
+    search_button:
+      primary: "button[title='Search']"
+      fallback: ".search button"
+      xpath: "//button[@title='Search']"
+      description: "Search submit button"
+      
+    cart_icon:
+      primary: ".minicart-wrapper .action.showcart"
+      fallback: "a[href*='cart']"
+      xpath: "//a[contains(@class, 'showcart') or contains(@href, 'cart')]"
+      description: "Shopping cart icon in header"
+      
+    account_menu:
+      primary: ".customer-welcome .customer-name"
+      fallback: ".header .customer"
+      xpath: "//div[contains(@class, 'customer-welcome')]"
+      description: "Customer account dropdown"
+      
+    # Main navigation
+    nav_men:
+      primary: "#ui-id-5"
+      fallback: "a[href*='/men']"
+      xpath: "//a[@id='ui-id-5' or contains(@href, '/men')]"
+      description: "Men's category navigation"
+      
+    nav_women:
+      primary: "#ui-id-4"
+      fallback: "a[href*='/women']"
+      xpath: "//a[@id='ui-id-4' or contains(@href, '/women')]"
+      description: "Women's category navigation"
+      
+    nav_gear:
+      primary: "#ui-id-6"
+      fallback: "a[href*='/gear']"
+      xpath: "//a[@id='ui-id-6' or contains(@href, '/gear')]"
+      description: "Gear category navigation"
+      
+    # Homepage content
+    hero_banner:
+      primary: ".page-wrapper .hero-banner"
+      fallback: ".hero, .banner-main"
+      xpath: "//div[contains(@class, 'hero') or contains(@class, 'banner')]"
+      description: "Main hero banner on homepage"
+      
+    featured_products:
+      primary: ".products-grid .product-item"
+      fallback: ".product-items .item"
+      xpath: "//div[contains(@class, 'product-item')]"
+      description: "Featured product tiles"
+
+  product_listing:
+    # Category page elements
+    page_title:
+      primary: ".page-title-wrapper h1"
+      fallback: "h1.page-title"
+      xpath: "//h1[contains(@class, 'page-title')]"
+      description: "Category page title"
+      
+    product_grid:
+      primary: ".products-grid"
+      fallback: ".products .items"
+      xpath: "//div[contains(@class, 'products-grid')]"
+      description: "Product grid container"
+      
+    product_item:
+      primary: ".product-item"
+      fallback: ".item.product"
+      xpath: "//div[contains(@class, 'product-item')]"
+      description: "Individual product tile"
+      
+    product_name:
+      primary: ".product-item-name a"
+      fallback: ".product-name a"
+      xpath: "//a[contains(@class, 'product-item-name')]"
+      description: "Product name link"
+      
+    product_price:
+      primary: ".product-item .price"
+      fallback: ".price-box .price"
+      xpath: "//span[contains(@class, 'price')]"
+      description: "Product price display"
+      
+    add_to_cart_button:
+      primary: ".product-item .action.tocart"
+      fallback: "button[title*='Add to Cart']"
+      xpath: "//button[contains(@title, 'Add to Cart')]"
+      description: "Add to cart button on product tile"
+      
+    # Filters and sorting
+    filter_sidebar:
+      primary: ".sidebar-main .filter"
+      fallback: ".layered-filter"
+      xpath: "//div[contains(@class, 'filter') or contains(@class, 'layered')]"
+      description: "Filter sidebar"
+      
+    sort_dropdown:
+      primary: "#sorter"
+      fallback: ".toolbar-sorter select"
+      xpath: "//select[@id='sorter']"
+      description: "Sort order dropdown"
+      
+    view_mode_grid:
+      primary: ".modes-mode.mode-grid"
+      fallback: "a[title='Grid']"
+      xpath: "//a[@title='Grid' or contains(@class, 'mode-grid')]"
+      description: "Grid view mode button"
+
+  product_detail:
+    # Product detail page elements
+    product_title:
+      primary: ".page-title span"
+      fallback: "h1.product-title"
+      xpath: "//h1//span | //h1[contains(@class, 'product-title')]"
+      description: "Product detail page title"
+      
+    product_price_detail:
+      primary: ".product-info-price .price"
+      fallback: ".price-box .regular-price"
+      xpath: "//div[contains(@class, 'product-info-price')]//span[contains(@class, 'price')]"
+      description: "Product price on detail page"
+      
+    product_image:
+      primary: ".product.media img"
+      fallback: ".product-image-main img"
+      xpath: "//div[contains(@class, 'product') and contains(@class, 'media')]//img"
+      description: "Main product image"
+      
+    size_selector:
+      primary: ".swatch-attribute[attribute-code='size']"
+      fallback: ".size .swatch-attribute"
+      xpath: "//div[@attribute-code='size' or contains(@class, 'size')]"
+      description: "Size selection options"
+      
+    color_selector:
+      primary: ".swatch-attribute[attribute-code='color']"
+      fallback: ".color .swatch-attribute"
+      xpath: "//div[@attribute-code='color' or contains(@class, 'color')]"
+      description: "Color selection options"
+      
+    quantity_input:
+      primary: "#qty"
+      fallback: "input[name='qty']"
+      xpath: "//input[@id='qty' or @name='qty']"
+      description: "Quantity input field"
+      
+    add_to_cart_main:
+      primary: "#product-addtocart-button"
+      fallback: "button[title='Add to Cart']"
+      xpath: "//button[@id='product-addtocart-button' or @title='Add to Cart']"
+      description: "Main add to cart button"
+      
+    add_to_wishlist:
+      primary: ".action.towishlist"
+      fallback: "a[title*='Add to Wish List']"
+      xpath: "//a[contains(@class, 'towishlist') or contains(@title, 'Wish List')]"
+      description: "Add to wishlist link"
+
+  shopping_cart:
+    # Shopping cart page elements
+    cart_title:
+      primary: ".page-title-wrapper h1"
+      fallback: "h1[data-ui-id='page-title-wrapper']"
+      xpath: "//h1[contains(text(), 'Shopping Cart')]"
+      description: "Shopping cart page title"
+      
+    cart_items:
+      primary: ".cart.item"
+      fallback: ".item-info"
+      xpath: "//tr[contains(@class, 'item-info')]"
+      description: "Cart item rows"
+      
+    item_name:
+      primary: ".item-info .product-item-name"
+      fallback: ".product-name a"
+      xpath: "//strong[contains(@class, 'product-item-name')]"
+      description: "Item name in cart"
+      
+    item_quantity:
+      primary: ".item-qty .qty"
+      fallback: "input[title='Qty']"
+      xpath: "//input[contains(@class, 'qty')]"
+      description: "Item quantity input"
+      
+    update_cart:
+      primary: "button[name='update_cart_action']"
+      fallback: ".update button"
+      xpath: "//button[@name='update_cart_action']"
+      description: "Update cart button"
+      
+    remove_item:
+      primary: ".action-delete"
+      fallback: "a[title='Remove item']"
+      xpath: "//a[contains(@class, 'action-delete')]"
+      description: "Remove item link"
+      
+    cart_subtotal:
+      primary: ".totals .amount"
+      fallback: ".grand.totals .price"
+      xpath: "//tr[contains(@class, 'grand')]//span[contains(@class, 'price')]"
+      description: "Cart subtotal amount"
+      
+    proceed_to_checkout:
+      primary: ".checkout-methods-items .action.primary.checkout"
+      fallback: "button[title*='Proceed to Checkout']"
+      xpath: "//button[contains(@title, 'Proceed to Checkout')]"
+      description: "Proceed to checkout button"
+
+  checkout:
+    # Checkout page elements
+    shipping_address:
+      primary: ".shipping-address-form"
+      fallback: ".step-content .form-shipping-address"
+      xpath: "//div[contains(@class, 'shipping-address-form')]"
+      description: "Shipping address form section"
+      
+    email_input:
+      primary: "#customer-email"
+      fallback: "input[name='username']"
+      xpath: "//input[@id='customer-email' or @name='username']"
+      description: "Email address input"
+      
+    first_name:
+      primary: "input[name='firstname']"
+      fallback: "#firstname"
+      xpath: "//input[@name='firstname']"
+      description: "First name input"
+      
+    last_name:
+      primary: "input[name='lastname']"
+      fallback: "#lastname"
+      xpath: "//input[@name='lastname']"
+      description: "Last name input"
+      
+    street_address:
+      primary: "input[name='street[0]']"
+      fallback: ".street input"
+      xpath: "//input[@name='street[0]']"
+      description: "Street address input"
+      
+    city:
+      primary: "input[name='city']"
+      fallback: "#city"
+      xpath: "//input[@name='city']"
+      description: "City input"
+      
+    region_dropdown:
+      primary: "select[name='region_id']"
+      fallback: ".region select"
+      xpath: "//select[@name='region_id']"
+      description: "State/Region dropdown"
+      
+    postal_code:
+      primary: "input[name='postcode']"
+      fallback: "#zip"
+      xpath: "//input[@name='postcode']"
+      description: "Postal code input"
+      
+    phone_number:
+      primary: "input[name='telephone']"
+      fallback: "#telephone"
+      xpath: "//input[@name='telephone']"
+      description: "Phone number input"
+      
+    shipping_methods:
+      primary: ".table-checkout-shipping-method"
+      fallback: ".shipping-method"
+      xpath: "//table[contains(@class, 'checkout-shipping-method')]"
+      description: "Shipping methods table"
+      
+    next_button:
+      primary: ".button.action.continue.primary"
+      fallback: "button[data-role='opc-continue']"
+      xpath: "//button[contains(@class, 'continue') and contains(@class, 'primary')]"
+      description: "Next/Continue button"
+      
+    payment_methods:
+      primary: ".payment-methods"
+      fallback: ".checkout-payment-method"
+      xpath: "//div[contains(@class, 'payment-methods')]"
+      description: "Payment methods section"
+      
+    place_order:
+      primary: ".action.primary.checkout"
+      fallback: "button[title='Place Order']"
+      xpath: "//button[@title='Place Order' or contains(@class, 'checkout')]"
+      description: "Place order button"
