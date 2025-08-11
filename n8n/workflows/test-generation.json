@@ -1,113 +1,37 @@
 {
   "name": "SpecWeaver Test Generation",
+  "active": false,
   "nodes": [
     {
-      "id": "webhook",
-      "name": "Webhook Start",
-      "type": "n8n-nodes-base.webhook",
       "parameters": {
         "path": "specweaver/ingest",
-        "responseMode": "onReceived",
-        "options": {"responseData": {"received": true}}
-      }
+        "responseMode": "onReceived"
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [280, 160]
     },
     {
-      "id": "parse",
-      "name": "Parse Requirement",
-      "type": "n8n-nodes-base.httpRequest",
       "parameters": {
         "url": "http://api:8080/api/requirements",
-        "method": "POST",
-        "sendBody": true,
-        "jsonParameters": true,
         "options": {},
+        "method": "POST",
+        "sendBody": true,
+        "jsonParameters": true,
         "bodyParametersJson": "={ \"story_text\": $json[\"story_text\"] }"
-      }
-    },
-    {
-      "id": "generate",
-      "name": "Generate Tests",
+      },
+      "id": "ParseRequirement",
+      "name": "Parse Requirement",
       "type": "n8n-nodes-base.httpRequest",
-      "parameters": {
-        "url": "=http://api:8080/api/requirements/{{$json[\"session_id\"]}}/generate",
-        "method": "POST",
-        "sendBody": true,
-        "jsonParameters": true,
-        "bodyParametersJson": "={ \"coverage\": \"comprehensive\", \"allow_duplicates\": false }"
-      }
-    },
-    {
-      "id": "manual",
-      "name": "Manual Approval",
-      "type": "n8n-nodes-base.manualTrigger",
-      "parameters": {}
-    },
-    {
-      "id": "approve",
-      "name": "Approve Tests",
-      "type": "n8n-nodes-base.httpRequest",
-      "parameters": {
-        "url": "=http://api:8080/api/requirements/{{$json[\"session_id\"]}}/approve",
-        "method": "POST",
-        "sendBody": true,
-        "jsonParameters": true,
-        "bodyParametersJson": "={ \"approved\": true, \"test_case_ids\": $json[\"test_case_ids\"] }"
-      }
-    },
-    {
-      "id": "run",
-      "name": "Run Locally",
-      "type": "n8n-nodes-base.httpRequest",
-      "parameters": {
-        "url": "http://api:8080/api/runs",
-        "method": "POST",
-        "sendBody": true,
-        "jsonParameters": true,
-        "bodyParametersJson": "={ \"session_id\": $json[\"session_id\"], \"ui_mode\": \"real\", \"api_mode\": \"mock\", \"auto_pr\": true }"
-      }
-    },
-    {
-      "id": "poll",
-      "name": "Poll Run Until Done",
-      "type": "n8n-nodes-base.httpRequest",
-      "parameters": {
-        "url": "=http://api:8080/api/runs/{{$json[\"run_id\"]}}",
-        "method": "GET"
-      }
-    },
-    {
-      "id": "if_pass",
-      "name": "If Passed",
-      "type": "n8n-nodes-base.if",
-      "parameters": {
-        "conditions": {
-          "boolean": [
-            { "value1": "={{$json.status}}", "operation": "equal", "value2": "completed" }
-          ]
-        }
-      }
-    },
-    {
-      "id": "noop",
-      "name": "No PR",
-      "type": "n8n-nodes-base.noOp",
-      "parameters": {}
-    },
-    {
-      "id": "auto_pr",
-      "name": "Auto PR (already triggered by API if auto_pr)",
-      "type": "n8n-nodes-base.noOp",
-      "parameters": {}
+      "typeVersion": 4,
+      "position": [560, 160]
     }
   ],
   "connections": {
-    "webhook": ["parse"],
-    "parse": ["generate"],
-    "generate": ["manual"],
-    "manual": ["approve"],
-    "approve": ["run"],
-    "run": ["poll"],
-    "poll": ["if_pass"],
-    "if_pass": ["auto_pr", "noop"]
+    "Webhook": {
+      "main": [ [ { "node": "Parse Requirement", "type": "main", "index": 0 } ] ]
+    }
   }
 }

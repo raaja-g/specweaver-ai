@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link, Route, Routes, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Bar, Line } from 'react-chartjs-2';
 import hljs from 'highlight.js/lib/core';
@@ -9,15 +10,65 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  PointElement,
+  LineElement,
   Title,
   Tooltip,
   Legend,
 } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend);
 
 type TestCaseSummary = { id: string; title: string; type: string; priority: string; trace_to: string[] };
 type Duplicate = { file: string; reason: string };
+
+function Nav() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderBottom: '1px solid #eee' }}>
+      <div style={{ fontSize: 28, fontWeight: 800 }}>SpecWeaver</div>
+      <Link to="/" style={{ textDecoration: 'none' }}>Dashboard</Link>
+      <Link to="/generate" style={{ textDecoration: 'none' }}>Test Generation</Link>
+      <Link to="/runs" style={{ textDecoration: 'none' }}>Runs</Link>
+    </div>
+  );
+}
+
+function Dashboard({ metrics }: { metrics: any }) {
+  const chartData = useMemo(() => {
+    if (!metrics) return { labels: [], datasets: [] };
+    const labels = Object.keys(metrics.test_types || {});
+    const data = Object.values(metrics.test_types || {});
+    return {
+      labels,
+      datasets: [
+        { label: 'Test Types Count', backgroundColor: 'rgba(99, 102, 241, 0.6)', data },
+      ],
+    };
+  }, [metrics]);
+  const timeSeries = useMemo(() => {
+    if (!metrics?.history) return { labels: [], datasets: [] };
+    const labels = metrics.history.map((m: any) => (m.completed_at || m.created_at || '').slice(11, 19));
+    const data = metrics.history.map((m: any) => (m.status === 'completed' ? 1 : 0));
+    return { labels, datasets: [{ label: 'Pass (1=yes)', data, borderColor: 'rgba(16,185,129,1)', backgroundColor: 'rgba(16,185,129,0.2)' }] };
+  }, [metrics]);
+  return (
+    <div style={{ display: 'flex', gap: 16 }}>
+      <div style={{ flex: 1 }}>
+        <h3>Current Run Distribution</h3>
+        <div style={{ height: 300 }}>
+          <Bar data={chartData as any} options={{ responsive: true, plugins: { legend: { display: false } } }} />
+        </div>
+      </div>
+      <div style={{ flex: 1 }}>
+        <h3>Pass Trend (recent runs)</h3>
+        <div style={{ height: 240 }}>
+          <Line data={timeSeries as any} options={{ responsive: true }} />
+        </div>
+        <div style={{ marginTop: 8 }}>Pass rate: {metrics?.pass_rate?.toFixed?.(1) ?? 0}%</div>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [story, setStory] = useState('');
@@ -40,6 +91,7 @@ export default function App() {
   }, []);
 
   const api = 'http://localhost:8080';
+  const navigate = useNavigate();
 
   const upload = async () => {
     const res = await axios.post(`${api}/api/requirements`, { story_text: story });
@@ -182,12 +234,9 @@ export default function App() {
     };
   }, [metrics]);
 
-  return (
-    <div style={{ padding: 24, fontFamily: 'Inter, system-ui, Arial' }}>
-      <h1>SpecWeaver</h1>
-      <div style={{ display: 'flex', gap: 16 }}>
-        <div style={{ flex: 1 }}>
-          <h3>Create Requirement</h3>
+  const GeneratePage = () => (
+    <div>
+      <h2>Create Requirement</h2>
           <textarea rows={8} cols={80} placeholder="Paste user story..." value={story} onChange={e => setStory(e.target.value)} />
           <div style={{ marginTop: 8 }}>
             <button onClick={upload}>1) Upload & Parse</button>
@@ -195,6 +244,7 @@ export default function App() {
               <input type="checkbox" checked={allowDup} onChange={e => setAllowDup(e.target.checked)} /> Allow duplicates
             </label>
             <button onClick={generate} disabled={!session} style={{ marginLeft: 12 }}>2) Generate Tests</button>
+            <button onClick={() => { if (tests.length) approve(); }} disabled={!tests.length} style={{ marginLeft: 12 }}>Generate tests + code</button>
           </div>
 
           <h3 style={{ marginTop: 16 }}>HIL Review & Approval</h3>
@@ -285,17 +335,26 @@ export default function App() {
               )}
             </div>
           )}
-        </div>
-        <div style={{ flex: 1 }}>
-          <h3>Dashboard</h3>
-          <div style={{ height: 300 }}>
-            <Bar data={chartData as any} options={{ responsive: true, plugins: { legend: { display: false }, title: { display: true, text: 'Current Run Distribution' } } }} />
-          </div>
-          <div style={{ height: 240, marginTop: 12 }}>
-            <Line data={timeSeries as any} options={{ responsive: true, plugins: { legend: { display: true }, title: { display: true, text: 'Pass Trend (recent runs)' } } }} />
-          </div>
-          <div style={{ marginTop: 8 }}>Pass rate: {metrics?.pass_rate?.toFixed?.(1) ?? 0}%</div>
-        </div>
+    </div>
+  );
+
+  const DashboardPage = () => (<Dashboard metrics={metrics} />);
+  const RunsPage = () => (
+    <div>
+      <h2>Runs</h2>
+      <pre>{JSON.stringify(metrics?.recent_runs || [], null, 2)}</pre>
+    </div>
+  );
+
+  return (
+    <div style={{ fontFamily: 'Inter, system-ui, Arial' }}>
+      <Nav />
+      <div style={{ padding: 24 }}>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/generate" element={<GeneratePage />} />
+          <Route path="/runs" element={<RunsPage />} />
+        </Routes>
       </div>
     </div>
   );

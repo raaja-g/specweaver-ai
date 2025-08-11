@@ -11,3 +11,10 @@ fastapi
 anyio
 websockets
 mcp
+rq
+redis
+rich
+python-multipart
+aiofiles
+python-docx
+pdfminer.six

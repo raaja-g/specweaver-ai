@@ -1,7 +1,7 @@
 """
 SpecWeaver API - FastAPI backend
 """
-from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -184,6 +184,46 @@ async def upload_requirement(req: RequirementUpload):
         }
     except Exception as e:
         logger.error(f"Failed to parse requirement: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/requirements/file")
+async def upload_requirement_file(
+    file: UploadFile = File(...),
+    domain: Optional[str] = Form(default=None),
+    tags: Optional[str] = Form(default=None),
+):
+    """Upload and parse a requirement from a file (.txt, .md, .docx, .pdf)."""
+    try:
+        suffix = (Path(file.filename).suffix or "").lower()
+        raw = await file.read()
+        text = ""
+        if suffix in [".txt", ".md"]:
+            text = raw.decode("utf-8", errors="ignore")
+        elif suffix == ".docx":
+            try:
+                import docx  # type: ignore
+                from io import BytesIO
+                doc = docx.Document(BytesIO(raw))
+                text = "\n".join([p.text for p in doc.paragraphs])
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"DOCX parsing failed: {e}")
+        elif suffix == ".pdf":
+            try:
+                from io import BytesIO
+                from pdfminer.high_level import extract_text  # type: ignore
+                text = extract_text(BytesIO(raw))
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"PDF parsing failed: {e}")
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type. Use .txt, .md, .docx, or .pdf")
+
+        body = RequirementUpload(story_text=text, domain=domain, tags=(tags.split(',') if tags else []))
+        return await upload_requirement(body)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("upload_requirement_file failed")
         raise HTTPException(status_code=400, detail=str(e))
 
 
