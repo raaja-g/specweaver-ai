@@ -1,0 +1,124 @@
+---
+# E-commerce Domain Pack - Intent Mapping
+# Maps natural language intents to domain-specific test patterns
+
+domain: ecommerce
+version: "1.0.0"
+description: "E-commerce domain pack with shopping, cart, checkout, and order management patterns"
+
+# Common user intents and their test patterns
+intents:
+  # Shopping & Browse
+  browse_products:
+    patterns: ["browse products", "view catalog", "search items", "filter products"]
+    entities: ["Product", "Category", "Filter", "SearchResults"]
+    test_templates: ["browse_and_filter", "search_validation"]
+    
+  add_to_cart:
+    patterns: ["add to cart", "add item", "put in basket", "add product"]
+    entities: ["Product", "Cart", "CartItem", "Inventory"]
+    test_templates: ["add_to_cart_success", "add_to_cart_validation", "inventory_check"]
+    
+  # Cart Management
+  view_cart:
+    patterns: ["view cart", "see basket", "check cart", "cart contents"]
+    entities: ["Cart", "CartItem", "Product"]
+    test_templates: ["cart_display", "cart_calculations"]
+    
+  update_cart:
+    patterns: ["update quantity", "change amount", "modify cart", "remove item"]
+    entities: ["Cart", "CartItem", "Quantity"]
+    test_templates: ["quantity_update", "item_removal", "cart_persistence"]
+    
+  # Checkout Process
+  checkout:
+    patterns: ["checkout", "proceed to payment", "place order", "complete purchase"]
+    entities: ["Cart", "Order", "Payment", "ShippingAddress", "BillingAddress"]
+    test_templates: ["guest_checkout", "registered_checkout", "payment_validation"]
+    
+  payment:
+    patterns: ["make payment", "pay now", "submit payment", "process payment"]
+    entities: ["Payment", "CreditCard", "PaymentMethod", "Order"]
+    test_templates: ["payment_success", "payment_failure", "payment_validation"]
+    
+  # Account Management
+  register:
+    patterns: ["create account", "sign up", "register", "new user"]
+    entities: ["User", "Account", "Profile", "Authentication"]
+    test_templates: ["user_registration", "email_verification", "account_validation"]
+    
+  login:
+    patterns: ["log in", "sign in", "authenticate", "access account"]
+    entities: ["User", "Authentication", "Session"]
+    test_templates: ["login_success", "login_failure", "session_management"]
+    
+  # Order Management
+  track_order:
+    patterns: ["track order", "order status", "shipment tracking", "delivery status"]
+    entities: ["Order", "Shipment", "TrackingInfo", "DeliveryStatus"]
+    test_templates: ["order_tracking", "status_updates", "delivery_notifications"]
+
+# Domain-specific entities with common attributes
+entities:
+  Product:
+    attributes: ["id", "name", "price", "description", "category", "inventory", "sku", "images"]
+    validations: ["price > 0", "inventory >= 0", "sku unique"]
+    
+  Cart:
+    attributes: ["id", "user_id", "items", "subtotal", "tax", "total", "created_at", "updated_at"]
+    validations: ["total = subtotal + tax", "items not empty for checkout"]
+    
+  CartItem:
+    attributes: ["product_id", "quantity", "unit_price", "total_price"]
+    validations: ["quantity > 0", "total_price = quantity * unit_price"]
+    
+  Order:
+    attributes: ["id", "user_id", "items", "subtotal", "tax", "shipping", "total", "status", "created_at"]
+    validations: ["total = subtotal + tax + shipping", "status in valid_statuses"]
+    
+  User:
+    attributes: ["id", "email", "first_name", "last_name", "phone", "addresses", "created_at"]
+    validations: ["email format", "email unique", "phone format"]
+    
+  Payment:
+    attributes: ["id", "order_id", "method", "amount", "status", "transaction_id", "created_at"]
+    validations: ["amount > 0", "status in payment_statuses"]
+
+# Common test data patterns
+test_data_patterns:
+  valid_product:
+    name: "Test Product"
+    price: 29.99
+    category: "Electronics"
+    inventory: 100
+    
+  valid_user:
+    email: "test@example.com"
+    first_name: "John"
+    last_name: "Doe"
+    phone: "+1-555-0123"
+    
+  valid_address:
+    street: "123 Main St"
+    city: "Anytown"
+    state: "CA"
+    zip: "12345"
+    country: "US"
+
+# Business rules and constraints
+business_rules:
+  - name: "minimum_order_amount"
+    description: "Orders must meet minimum amount for checkout"
+    rule: "order.total >= 10.00"
+    
+  - name: "inventory_check"
+    description: "Cannot add more items than available inventory"
+    rule: "cart_item.quantity <= product.inventory"
+    
+  - name: "valid_email"
+    description: "User email must be valid format"
+    rule: "email matches /^[^@]+@[^@]+\\.[^@]+$/"
+    
+  - name: "payment_amount_match"
+    description: "Payment amount must match order total"
+    rule: "payment.amount == order.total"

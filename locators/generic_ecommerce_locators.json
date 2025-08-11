@@ -1,0 +1,228 @@
+{
+  "metadata": {
+    "generated_at": "2024-01-15T10:30:00Z",
+    "target_url": "generic",
+    "version": "1.0.0",
+    "description": "Generic e-commerce locator patterns for runtime adaptation"
+  },
+  "pages": {
+    "product_catalog": {
+      "search_input": {
+        "primary": "input[type='search'], input[placeholder*='search' i], #search",
+        "fallback": "[data-testid*='search'], [aria-label*='search' i]",
+        "xpath": "//input[@type='search' or contains(@placeholder, 'search') or @id='search']",
+        "attributes": ["placeholder", "aria-label", "data-testid", "id", "name"],
+        "description": "Product search input field"
+      },
+      "search_button": {
+        "primary": "button[type='submit']:has(input[type='search']) ~ *, button[aria-label*='search' i]",
+        "fallback": ".search-btn, .search-button, [data-testid*='search-btn']",
+        "xpath": "//button[contains(@aria-label, 'search') or contains(@class, 'search')]",
+        "attributes": ["aria-label", "data-testid", "class", "type"],
+        "description": "Search submit button"
+      },
+      "product_grid": {
+        "primary": ".products, .product-grid, .catalog-grid, [data-testid*='product-grid']",
+        "fallback": ".items, .product-list",
+        "xpath": "//div[contains(@class, 'product') and (contains(@class, 'grid') or contains(@class, 'list'))]",
+        "attributes": ["class", "data-testid", "role"],
+        "description": "Product grid container"
+      },
+      "product_item": {
+        "primary": ".product-item, .product-card, .catalog-item, [data-testid*='product-item']",
+        "fallback": ".item, .product",
+        "xpath": "//div[contains(@class, 'product-item') or contains(@class, 'product-card')]",
+        "attributes": ["class", "data-testid", "data-product-id"],
+        "description": "Individual product item"
+      },
+      "product_name": {
+        "primary": ".product-name a, .product-title a, h3 a, [data-testid*='product-name']",
+        "fallback": ".name a, .title a",
+        "xpath": "//a[contains(@class, 'product-name') or contains(@class, 'product-title')]",
+        "attributes": ["class", "data-testid", "href"],
+        "description": "Product name link"
+      },
+      "product_price": {
+        "primary": ".price, .product-price, .cost, [data-testid*='price']",
+        "fallback": ".amount, .value",
+        "xpath": "//span[contains(@class, 'price') or contains(@class, 'cost')]",
+        "attributes": ["class", "data-testid", "data-price"],
+        "description": "Product price display"
+      },
+      "add_to_cart": {
+        "primary": "button[data-testid*='add-cart'], .add-to-cart, button:contains('Add to Cart')",
+        "fallback": ".btn-cart, .cart-btn, button[title*='Add to Cart']",
+        "xpath": "//button[contains(text(), 'Add to Cart') or contains(@title, 'Add to Cart')]",
+        "attributes": ["data-testid", "class", "title", "aria-label"],
+        "description": "Add to cart button"
+      }
+    },
+    "product_detail": {
+      "product_title": {
+        "primary": "h1, .product-title, .product-name, [data-testid*='product-title']",
+        "fallback": ".title, .name",
+        "xpath": "//h1 | //div[contains(@class, 'product-title')]",
+        "attributes": ["class", "data-testid"],
+        "description": "Product detail page title"
+      },
+      "product_image": {
+        "primary": ".product-image img, .product-photo img, [data-testid*='product-image'] img",
+        "fallback": ".image img, .photo img",
+        "xpath": "//img[contains(@class, 'product-image') or contains(@alt, 'product')]",
+        "attributes": ["class", "data-testid", "alt", "src"],
+        "description": "Main product image"
+      },
+      "size_selector": {
+        "primary": ".size-options, .size-selector, [data-testid*='size'], select[name*='size']",
+        "fallback": ".sizes, .size",
+        "xpath": "//select[contains(@name, 'size')] | //div[contains(@class, 'size')]",
+        "attributes": ["class", "data-testid", "name"],
+        "description": "Size selection control"
+      },
+      "color_selector": {
+        "primary": ".color-options, .color-selector, [data-testid*='color'], select[name*='color']",
+        "fallback": ".colors, .color",
+        "xpath": "//select[contains(@name, 'color')] | //div[contains(@class, 'color')]",
+        "attributes": ["class", "data-testid", "name"],
+        "description": "Color selection control"
+      },
+      "quantity_input": {
+        "primary": "input[name*='qty'], input[name*='quantity'], #qty, [data-testid*='quantity']",
+        "fallback": ".qty, .quantity input",
+        "xpath": "//input[contains(@name, 'qty') or contains(@name, 'quantity')]",
+        "attributes": ["name", "data-testid", "id", "class"],
+        "description": "Quantity input field"
+      },
+      "add_to_cart_main": {
+        "primary": "#add-to-cart, .add-to-cart-main, button[data-testid*='add-cart-main']",
+        "fallback": ".btn-add-cart, button[title*='Add to Cart']",
+        "xpath": "//button[@id='add-to-cart' or contains(@title, 'Add to Cart')]",
+        "attributes": ["id", "data-testid", "class", "title"],
+        "description": "Main add to cart button"
+      }
+    },
+    "shopping_cart": {
+      "cart_items": {
+        "primary": ".cart-item, .line-item, [data-testid*='cart-item']",
+        "fallback": ".item, .product-item",
+        "xpath": "//div[contains(@class, 'cart-item') or contains(@class, 'line-item')]",
+        "attributes": ["class", "data-testid", "data-item-id"],
+        "description": "Shopping cart items"
+      },
+      "item_name": {
+        "primary": ".item-name, .product-name, [data-testid*='item-name']",
+        "fallback": ".name, .title",
+        "xpath": "//div[contains(@class, 'item-name') or contains(@class, 'product-name')]",
+        "attributes": ["class", "data-testid"],
+        "description": "Cart item name"
+      },
+      "item_quantity": {
+        "primary": ".qty input, .quantity input, [data-testid*='item-qty'] input",
+        "fallback": "input[name*='qty']",
+        "xpath": "//input[contains(@class, 'qty') or contains(@name, 'qty')]",
+        "attributes": ["class", "data-testid", "name"],
+        "description": "Cart item quantity"
+      },
+      "remove_item": {
+        "primary": ".remove-item, .delete-item, [data-testid*='remove-item']",
+        "fallback": ".remove, .delete, button[title*='Remove']",
+        "xpath": "//button[contains(@class, 'remove') or contains(@title, 'Remove')]",
+        "attributes": ["class", "data-testid", "title", "aria-label"],
+        "description": "Remove item from cart"
+      },
+      "cart_total": {
+        "primary": ".cart-total, .total-amount, [data-testid*='cart-total']",
+        "fallback": ".total, .amount",
+        "xpath": "//div[contains(@class, 'cart-total') or contains(@class, 'total')]",
+        "attributes": ["class", "data-testid"],
+        "description": "Cart total amount"
+      },
+      "checkout_button": {
+        "primary": ".checkout-btn, button[data-testid*='checkout'], .proceed-checkout",
+        "fallback": "button:contains('Checkout'), a[href*='checkout']",
+        "xpath": "//button[contains(text(), 'Checkout')] | //a[contains(@href, 'checkout')]",
+        "attributes": ["class", "data-testid", "href"],
+        "description": "Proceed to checkout button"
+      }
+    },
+    "checkout": {
+      "email_input": {
+        "primary": "input[type='email'], input[name*='email'], #email, [data-testid*='email']",
+        "fallback": ".email input",
+        "xpath": "//input[@type='email' or contains(@name, 'email')]",
+        "attributes": ["type", "name", "data-testid", "id"],
+        "description": "Email address input"
+      },
+      "first_name": {
+        "primary": "input[name*='firstname'], input[name*='first_name'], #firstname, [data-testid*='first-name']",
+        "fallback": ".firstname input, .first-name input",
+        "xpath": "//input[contains(@name, 'first')]",
+        "attributes": ["name", "data-testid", "id"],
+        "description": "First name input"
+      },
+      "last_name": {
+        "primary": "input[name*='lastname'], input[name*='last_name'], #lastname, [data-testid*='last-name']",
+        "fallback": ".lastname input, .last-name input",
+        "xpath": "//input[contains(@name, 'last')]",
+        "attributes": ["name", "data-testid", "id"],
+        "description": "Last name input"
+      },
+      "address_line1": {
+        "primary": "input[name*='address1'], input[name*='street'], #address1, [data-testid*='address-1']",
+        "fallback": ".address input, .street input",
+        "xpath": "//input[contains(@name, 'address') or contains(@name, 'street')]",
+        "attributes": ["name", "data-testid", "id"],
+        "description": "Address line 1 input"
+      },
+      "city": {
+        "primary": "input[name*='city'], #city, [data-testid*='city']",
+        "fallback": ".city input",
+        "xpath": "//input[contains(@name, 'city')]",
+        "attributes": ["name", "data-testid", "id"],
+        "description": "City input"
+      },
+      "state_region": {
+        "primary": "select[name*='state'], select[name*='region'], #state, [data-testid*='state']",
+        "fallback": ".state select, .region select",
+        "xpath": "//select[contains(@name, 'state') or contains(@name, 'region')]",
+        "attributes": ["name", "data-testid", "id"],
+        "description": "State/Region selector"
+      },
+      "postal_code": {
+        "primary": "input[name*='zip'], input[name*='postal'], #zipcode, [data-testid*='postal']",
+        "fallback": ".zip input, .postal input",
+        "xpath": "//input[contains(@name, 'zip') or contains(@name, 'postal')]",
+        "attributes": ["name", "data-testid", "id"],
+        "description": "Postal/ZIP code input"
+      },
+      "phone": {
+        "primary": "input[name*='phone'], input[name*='tel'], input[type='tel'], [data-testid*='phone']",
+        "fallback": ".phone input, .telephone input",
+        "xpath": "//input[@type='tel' or contains(@name, 'phone') or contains(@name, 'tel')]",
+        "attributes": ["type", "name", "data-testid", "id"],
+        "description": "Phone number input"
+      },
+      "payment_methods": {
+        "primary": ".payment-methods, .payment-options, [data-testid*='payment-methods']",
+        "fallback": ".payment, .billing",
+        "xpath": "//div[contains(@class, 'payment')]",
+        "attributes": ["class", "data-testid"],
+        "description": "Payment methods section"
+      },
+      "credit_card_number": {
+        "primary": "input[name*='card'], input[name*='credit'], [data-testid*='card-number']",
+        "fallback": ".card-number input, #cardnumber",
+        "xpath": "//input[contains(@name, 'card') or contains(@placeholder, 'card')]",
+        "attributes": ["name", "data-testid", "placeholder"],
+        "description": "Credit card number input"
+      },
+      "place_order": {
+        "primary": ".place-order, button[data-testid*='place-order'], #place-order-btn",
+        "fallback": "button:contains('Place Order'), .submit-order",
+        "xpath": "//button[contains(text(), 'Place Order') or contains(@class, 'place-order')]",
+        "attributes": ["class", "data-testid", "id"],
+        "description": "Place order button"
+      }
+    }
+  }
+}

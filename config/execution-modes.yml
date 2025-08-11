@@ -1,0 +1,239 @@
+---
+# SpecWeaver Execution Modes Configuration
+# Defines how tests execute against different environments and mocking strategies
+
+version: "1.0.0"
+description: "Execution mode configurations for UI and API tests"
+
+# Default execution modes
+defaults:
+  ui_mode: "real"      # real | mock
+  api_mode: "mock"     # mock | stub | real
+  parallel: true
+  headless: true
+  timeout: 30000       # milliseconds
+  retry_attempts: 2
+
+# UI Execution Modes
+ui_modes:
+  real:
+    description: "Execute against real UI elements"
+    browser: "chromium"
+    headless: true
+    viewport:
+      width: 1280
+      height: 720
+    options:
+      - "--disable-web-security"
+      - "--disable-features=VizDisplayCompositor"
+    screenshots: true
+    video: false
+    trace: false
+    
+  mock:
+    description: "Execute with mocked UI interactions"
+    browser: "chromium"
+    headless: true
+    viewport:
+      width: 1280
+      height: 720
+    mock_responses: true
+    mock_navigation: true
+    mock_interactions: true
+    screenshots: false
+    video: false
+    trace: false
+
+# API Execution Modes  
+api_modes:
+  mock:
+    description: "Use mock API responses for fast, isolated testing"
+    strategy: "wiremock"
+    base_url: "http://localhost:8089"
+    mock_data_dir: "tests/mocks/api"
+    response_delay: 0
+    fail_on_no_match: true
+    
+  stub:
+    description: "Use API stubs with predefined responses"
+    strategy: "prism"
+    base_url: "http://localhost:4010" 
+    spec_file: "api/openapi.yml"
+    prefer_examples: true
+    dynamic_examples: true
+    validate_requests: true
+    
+  real:
+    description: "Execute against real API endpoints"
+    base_url: "${TARGET_API_URL}"
+    timeout: 10000
+    retry_attempts: 3
+    rate_limit: 10  # requests per second
+    auth_required: true
+
+# Environment-specific overrides
+environments:
+  development:
+    defaults:
+      ui_mode: "real"
+      api_mode: "mock"
+    target_urls:
+      ui: "http://localhost:3000"
+      api: "http://localhost:8080"
+      
+  staging:
+    defaults:
+      ui_mode: "real" 
+      api_mode: "stub"
+    target_urls:
+      ui: "https://staging.example.com"
+      api: "https://api-staging.example.com"
+      
+  production:
+    defaults:
+      ui_mode: "real"
+      api_mode: "real"
+    target_urls:
+      ui: "https://luma.enablementadobe.com"
+      api: "https://api.example.com"
+    restrictions:
+      read_only: true
+      whitelist_endpoints: 
+        - "/api/products"
+        - "/api/categories"
+
+# Test execution settings
+execution:
+  parallel_workers: 4
+  test_timeout: 300000  # 5 minutes
+  step_timeout: 30000   # 30 seconds
+  page_load_timeout: 30000
+  
+  retry:
+    max_attempts: 3
+    delay: 1000  # milliseconds
+    backoff_multiplier: 2
+    
+  reporting:
+    allure: true
+    html: true
+    json: true
+    junit: false
+    
+  artifacts:
+    screenshots_on_failure: true
+    videos_on_failure: false
+    traces_on_failure: false
+    har_files: false
+
+# Browser configurations
+browsers:
+  chromium:
+    args:
+      - "--no-sandbox"
+      - "--disable-setuid-sandbox"
+      - "--disable-dev-shm-usage"
+      - "--disable-gpu"
+      - "--disable-extensions"
+    user_agent: "SpecWeaver-Test-Agent/1.0"
+    
+  firefox:
+    args:
+      - "--headless"
+    preferences:
+      "dom.webnotifications.enabled": false
+      "media.navigator.permission.disabled": true
+      
+  webkit:
+    args: []
+
+# Mock service configurations
+mock_services:
+  wiremock:
+    port: 8089
+    admin_port: 8090
+    mappings_dir: "tests/mocks/wiremock/mappings"
+    files_dir: "tests/mocks/wiremock/__files"
+    
+  prism:
+    port: 4010
+    spec_file: "api/openapi.yml"
+    dynamic: true
+    validate: true
+
+# Data management
+test_data:
+  faker_locale: "en_US"
+  seed: null  # null for random, number for deterministic
+  
+  generators:
+    user:
+      email: "test+{random}@example.com"
+      password: "TestPass123!"
+      first_name: "{fake.first_name}"
+      last_name: "{fake.last_name}"
+      
+    product:
+      name: "{fake.commerce.product_name}"
+      price: "{fake.commerce.price}"
+      description: "{fake.text.text(max_nb_chars=200)}"
+      
+    address:
+      street: "{fake.street_address}"
+      city: "{fake.city}"
+      state: "{fake.state_abbr}"
+      zip: "{fake.zipcode}"
+
+# Security and compliance
+security:
+  mask_sensitive_data: true
+  sensitive_fields:
+    - "password"
+    - "credit_card"
+    - "ssn"
+    - "api_key"
+    - "token"
+    
+  allowed_domains:
+    - "localhost"
+    - "127.0.0.1"
+    - "*.example.com"
+    - "luma.enablementadobe.com"
+    
+  blocked_requests:
+    - "*/analytics/*"
+    - "*/tracking/*"
+    - "*/ads/*"
+
+# Quality gates and thresholds
+quality_gates:
+  max_test_duration: 600  # seconds
+  min_pass_rate: 0.95     # 95%
+  max_flaky_rate: 0.05    # 5%
+  
+  performance:
+    max_page_load_time: 3000  # milliseconds
+    max_api_response_time: 2000
+    max_step_duration: 30000
+
+# Integration settings
+integrations:
+  allure:
+    results_dir: "artifacts/allure-results"
+    report_dir: "artifacts/allure-report"
+    
+  slack:
+    enabled: false
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channels:
+      - "#qa-automation"
+      
+  jira:
+    enabled: false
+    base_url: "${JIRA_BASE_URL}"
+    project_key: "QA"
+    
+  github:
+    enabled: true
+    auto_pr: false
+    pr_template: ".github/pull_request_template.md"

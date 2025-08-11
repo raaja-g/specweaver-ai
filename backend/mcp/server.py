@@ -99,6 +99,43 @@ async def mcp_handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
             result = subprocess.run(cmd, capture_output=True, text=True)
             return {"ok": True, "result": {"exit_code": result.returncode, "stdout": result.stdout, "stderr": result.stderr}}
 
+        if method == "validate_artifacts":
+            rg = params.get("requirement_graph")
+            ts = params.get("test_suite")
+            if not (isinstance(rg, dict) and isinstance(ts, dict)):
+                raise ToolError("invalid_params", "requirement_graph and test_suite are required")
+            
+            try:
+                requirement_graph = RequirementGraph(**rg)
+                suite = TestSuite(**ts)
+                
+                issues = []
+                
+                # Validate requirement graph completeness
+                if not requirement_graph.acceptanceCriteria:
+                    issues.append({"type": "missing_ac", "message": "No acceptance criteria defined"})
+                
+                # Validate test case coverage
+                ac_ids = {ac.id for ac in requirement_graph.acceptanceCriteria}
+                covered_acs = set()
+                for tc in suite.test_cases:
+                    covered_acs.update(tc.traceTo)
+                
+                uncovered = ac_ids - covered_acs
+                if uncovered:
+                    issues.append({"type": "coverage_gap", "message": f"Uncovered ACs: {list(uncovered)}"})
+                
+                # Validate test case structure
+                for tc in suite.test_cases:
+                    if not tc.steps:
+                        issues.append({"type": "empty_test", "message": f"Test {tc.id} has no steps"})
+                    if not tc.traceTo:
+                        issues.append({"type": "no_traceability", "message": f"Test {tc.id} not traced to any AC"})
+                
+                return {"ok": True, "result": {"valid": len(issues) == 0, "issues": issues}}
+            except Exception as e:
+                raise ToolError("validation_error", str(e))
+
         raise ToolError("unknown_method", f"Unknown method: {method}")
     except ToolError as te:
         return {"ok": False, "error": {"code": te.code, "message": te.message}}
