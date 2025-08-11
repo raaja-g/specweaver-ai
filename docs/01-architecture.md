@@ -4,7 +4,7 @@
 - Parsing Engine: LLM + spaCy + rules -> Requirement Graph
 - Test Case Generator: decision tables, ECP/BVA, risk heuristics -> structured cases (JSON/YAML)
 - Script Synthesis: Jinja2 templates -> pytest + Playwright tests
-- Mapping: locator repo (UI) + OpenAPI (API)
+- Mapping: locator repo (YAML/JSON) (UI) + OpenAPI (API)
 - Data: Faker + constraints
 - Runner/Reporter: pytest xdist + Allure/HTML
 
