@@ -18,3 +18,11 @@ python-multipart
 aiofiles
 python-docx
 pdfminer.six
+groq
+google-generativeai
+openai
+ollama
+playwright
+pytest-playwright
+pytest-html
+pytest-xdist

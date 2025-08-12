@@ -86,22 +86,33 @@ class LLMOrchestrator:
         
         return providers
 
-    def _load_model_config(self) -> Dict[str, str]:
-        """Load model names from config/llm.yml and/or env vars."""
+    def _load_model_config(self) -> Dict[str, Any]:
+        """Load model names and routing config from config/llm.yml and/or env vars."""
         defaults = {
-            "local": os.getenv("LOCAL_MODEL", "llama3.2"),
-            "groq": os.getenv("GROQ_MODEL", "compound-beta"),
-            "gemini": os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
-            "openai": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            "models": {
+                "local": os.getenv("LOCAL_MODEL", "llama3.2"),
+                "groq": os.getenv("GROQ_MODEL", "compound-beta"),
+                "gemini": os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+                "openai": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            },
+            "routing": {
+                "enable_local": False,
+                "order": ["groq", "gemini", "openai"],
+                "max_retries": 3,
+                "timeout_seconds": 30
+            }
         }
         cfg_path = Path("config/llm.yml")
         if cfg_path.exists() and yaml is not None:
             try:
                 data = yaml.safe_load(cfg_path.read_text()) or {}
-                models = (data.get("models") or {})
-                defaults.update({k: v for k, v in models.items() if isinstance(v, str) and v})
-            except Exception:
-                logger.warning("Failed to load config/llm.yml; using env/defaults")
+                if "models" in data:
+                    defaults["models"].update(data["models"])
+                if "routing" in data:
+                    defaults["routing"].update(data["routing"])
+                logger.info(f"Loaded LLM config with order: {defaults['routing']['order']}")
+            except Exception as e:
+                logger.warning(f"Failed to load config/llm.yml: {e}; using env/defaults")
         return defaults
     
     def _is_sensitive(self, text: str) -> bool:
@@ -116,6 +127,13 @@ class LLMOrchestrator:
     
     def _should_use_local(self, prompt: str, task_type: str) -> bool:
         """Determine if local model should be preferred"""
+        # Respect routing config: disable local if not enabled
+        try:
+            routing = self.model_config.get("routing", {})
+            if not routing.get("enable_local", False):
+                return False
+        except Exception:
+            return False
         # Use local for sensitive data or high-volume tasks
         if self._is_sensitive(prompt):
             logger.info("Using local model for sensitive data")
@@ -136,8 +154,9 @@ class LLMOrchestrator:
         try:
             start = time.time()
             client = self.providers[LLMProvider.LOCAL]
+            model_name = self.model_config["models"].get("local", "llama3.2")
             response = client.generate(
-                model=self.model_config.get("local", "llama3.2"),
+                model=model_name,
                 prompt=f"{system}\n\n{prompt}"
             )
             latency = (time.time() - start) * 1000
@@ -145,7 +164,7 @@ class LLMOrchestrator:
             return LLMResponse(
                 content=response['response'],
                 provider=LLMProvider.LOCAL,
-                model=self.model_config.get("local", "llama3.2"),
+                model=model_name,
                 latency_ms=latency
             )
         except Exception as e:
@@ -161,7 +180,7 @@ class LLMOrchestrator:
             start = time.time()
             client = self.providers[LLMProvider.GROQ]
             response = client.chat.completions.create(
-                model=self.model_config.get("groq", "compound-beta"),
+                model=self.model_config["models"].get("groq", "compound-beta"),
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": prompt}
@@ -174,7 +193,7 @@ class LLMOrchestrator:
             return LLMResponse(
                 content=response.choices[0].message.content,
                 provider=LLMProvider.GROQ,
-                model=self.model_config.get("groq", "compound-beta"),
+                model=self.model_config["models"].get("groq", "compound-beta"),
                 latency_ms=latency,
                 token_count=response.usage.total_tokens if response.usage else None
             )
@@ -190,7 +209,7 @@ class LLMOrchestrator:
         try:
             start = time.time()
             genai = self.providers[LLMProvider.GEMINI]
-            model_name = self.model_config.get("gemini", "gemini-1.5-flash")
+            model_name = self.model_config["models"].get("gemini", "gemini-1.5-flash")
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(f"{system}\n\n{prompt}")
             latency = (time.time() - start) * 1000
@@ -214,7 +233,7 @@ class LLMOrchestrator:
             start = time.time()
             client = self.providers[LLMProvider.OPENAI]
             response = client.chat.completions.create(
-                model=self.model_config.get("openai", "gpt-4o-mini"),
+                model=self.model_config["models"].get("openai", "gpt-4o-mini"),
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": prompt}
@@ -227,7 +246,7 @@ class LLMOrchestrator:
             return LLMResponse(
                 content=response.choices[0].message.content,
                 provider=LLMProvider.OPENAI,
-                model=self.model_config.get("openai", "gpt-4o-mini"),
+                model=self.model_config["models"].get("openai", "gpt-4o-mini"),
                 latency_ms=latency,
                 token_count=response.usage.total_tokens if response.usage else None
             )
@@ -266,10 +285,25 @@ class LLMOrchestrator:
             if response := self._call_local(prompt, system):
                 return response
         
-        # Cloud fallback chain
-        for handler in [self._call_groq, self._call_gemini, self._call_openai]:
-            if response := handler(prompt, system):
-                return response
+        # Cloud fallback chain - use configured order
+        provider_handlers = {
+            "groq": self._call_groq,
+            "gemini": self._call_gemini,
+            "openai": self._call_openai,
+            "local": self._call_local
+        }
+        
+        fallback_order = self.model_config["routing"]["order"]
+        logger.info(f"Using LLM fallback order: {fallback_order}")
+        
+        for provider_name in fallback_order:
+            if handler := provider_handlers.get(provider_name):
+                logger.info(f"Trying LLM provider: {provider_name}")
+                if response := handler(prompt, system):
+                    logger.info(f"✅ {provider_name} succeeded")
+                    return response
+                else:
+                    logger.warning(f"❌ {provider_name} failed, trying next provider")
         
         # All failed
         return LLMResponse(

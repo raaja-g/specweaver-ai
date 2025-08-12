@@ -2,7 +2,9 @@
 SpecWeaver API - FastAPI backend
 """
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -40,6 +42,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for reports
+reports_dir = Path("reports")
+reports_dir.mkdir(exist_ok=True)
+app.mount("/reports", StaticFiles(directory=str(reports_dir)), name="reports")
 
 # Storage
 ARTIFACTS_DIR = Path("artifacts")
@@ -170,7 +177,8 @@ async def upload_requirement(req: RequirementUpload):
         sessions[session_id] = {
             "requirement": requirement,
             "created_at": datetime.utcnow(),
-            "status": "parsed"
+            "status": "parsed",
+            "raw_text": req.story_text
         }
         
         return {
@@ -235,11 +243,15 @@ async def generate_test_cases(session_id: str, req: GenerateRequest):
     
     try:
         requirement = sessions[session_id]["requirement"]
+        # Pass original raw user input to generator for direct LLM BDD
+        raw_text = sessions[session_id].get("raw_text")
+        if raw_text:
+            requirement.raw_text = raw_text  # type: ignore
         
-        # Generate test cases
+        # Generate test cases (threadpool to avoid event loop conflicts)
         orchestrator = LLMOrchestrator()
         generator = TestCaseGenerator(orchestrator)
-        test_suite = generator.generate(requirement, coverage=req.coverage)
+        test_suite = await run_in_threadpool(generator.generate, requirement, req.coverage)
         
         # Save to artifacts
         suite_file = ARTIFACTS_DIR / session_id / "test_cases.json"
@@ -270,7 +282,9 @@ async def generate_test_cases(session_id: str, req: GenerateRequest):
                     "title": tc.title,
                     "type": tc.type,
                     "priority": tc.priority,
-                    "trace_to": tc.traceTo
+                    "trace_to": tc.traceTo,
+                    "preconditions": tc.preconditions,
+                    "data": tc.data,  # includes raw_steps/examples if present
                 }
                 for tc in test_suite.test_cases
             ],
@@ -303,9 +317,21 @@ async def approve_tests(session_id: str, req: ApprovalRequest):
         
         # Reuse scan on approved set
         approved_suite_path = ARTIFACTS_DIR / session_id / "approved_test_cases.json"
+        
+        # Serialize test cases safely, handling datetime objects
+        def safe_serialize(obj):
+            if hasattr(obj, 'model_dump'):
+                data = obj.model_dump()
+                # Convert any datetime objects to strings
+                for key, value in data.items():
+                    if hasattr(value, 'isoformat'):
+                        data[key] = value.isoformat()
+                return data
+            return str(obj)
+        
         approved_suite_json = {
             "requirement_id": requirement.id,
-            "test_cases": [tc.model_dump() for tc in test_suite.test_cases if tc.id in req.test_case_ids]
+            "test_cases": [safe_serialize(tc) for tc in test_suite.test_cases if tc.id in req.test_case_ids]
         }
         (ARTIFACTS_DIR / session_id).mkdir(exist_ok=True)
         approved_suite_path.write_text(json.dumps(approved_suite_json, indent=2))
@@ -318,11 +344,12 @@ async def approve_tests(session_id: str, req: ApprovalRequest):
         if duplicates and not req.allow_duplicates:
             raise HTTPException(status_code=409, detail={"duplicates": duplicates})
 
-        # Generate code for approved tests
+        # Generate code for approved tests with proper functional organization
         config = ExecutionConfig()
         synthesizer = CodeSynthesizer()
         
-        test_dir = Path("tests") / "approved" / session_id
+        # Write directly to framework tests/ root (no per-session folders)
+        test_dir = Path("tests")
         test_suite.test_cases = approved_cases  # Only approved
         generated_files = synthesizer.synthesize(requirement, test_suite, config, test_dir)
         
@@ -364,19 +391,26 @@ async def run_tests(req: RunRequest, background_tasks: BackgroundTasks):
     }
     
     # Queue background execution (RQ/Redis if available)
+    # Try RQ if Redis is available, otherwise use BackgroundTasks
+    use_rq = False
     if os.getenv("REDIS_URL"):
         try:
             import redis
             from rq import Queue
 
             conn = redis.from_url(os.getenv("REDIS_URL"))
+            # Test Redis connection
+            conn.ping()
             q = Queue("specweaver", connection=conn, default_timeout=3600)
             job = q.enqueue("backend.api.worker.run_tests_job", run_id, req.session_id, req.ui_mode, req.api_mode, req.auto_pr, test_runs[run_id]["requirement_id"])
             test_runs[run_id]["job_id"] = job.id
-        except Exception:
-            logger.exception("RQ enqueue failed, falling back to BackgroundTasks")
+            use_rq = True
+            logger.info(f"✅ Queued job {job.id} for run {run_id}")
+        except Exception as e:
+            logger.warning(f"❌ RQ enqueue failed ({e}), falling back to BackgroundTasks")
             background_tasks.add_task(execute_tests, run_id, req)
     else:
+        logger.info("No REDIS_URL configured, using BackgroundTasks")
         background_tasks.add_task(execute_tests, run_id, req)
     
     return {
@@ -394,8 +428,8 @@ async def execute_tests(run_id: str, req: RunRequest):
         test_runs[run_id]["status"] = "running"
         test_runs[run_id]["started_at"] = datetime.utcnow()
         
-        # Run pytest
-        test_dir = Path("tests") / "approved" / req.session_id
+        # Run pytest from framework tests/ root
+        test_dir = Path("tests")
         cmd = [
             "pytest", str(test_dir),
             "-q", "--tb=short",
@@ -440,11 +474,30 @@ async def execute_tests(run_id: str, req: RunRequest):
 
 @app.get("/api/runs/{run_id}")
 async def get_run_status(run_id: str):
-    """Get test run status"""
+    """Get test run status with logs and reports"""
     if run_id not in test_runs:
         raise HTTPException(status_code=404, detail="Run not found")
     
-    return test_runs[run_id]
+    # Attempt to refresh from persisted file to avoid stale "queued" status
+    try:
+        if RUNS_FILE.exists():
+            data = json.loads(RUNS_FILE.read_text())
+            if run_id in data:
+                # Coerce timestamps
+                for ts in ["created_at", "started_at", "completed_at"]:
+                    if data[run_id].get(ts):
+                        try:
+                            data[run_id][ts] = datetime.fromisoformat(data[run_id][ts])
+                        except Exception:
+                            pass
+                test_runs[run_id].update(data[run_id])
+    except Exception:
+        logger.exception("Failed to refresh run status in get_run_status")
+    
+    run_data = test_runs[run_id].copy()
+    run_data['logs'] = _get_run_logs(run_id)
+    run_data['reports'] = _get_run_reports(run_id)
+    return run_data
 
 
 @app.post("/api/runs/{run_id}/refresh")
@@ -465,6 +518,87 @@ async def refresh_run_status(run_id: str):
     except Exception:
         logger.exception("Failed to refresh run status")
     return test_runs[run_id]
+
+
+def _get_run_logs(run_id: str) -> List[Dict[str, Any]]:
+    """Get execution logs for a run"""
+    logs = []
+    logs_dir = Path("artifacts/logs")
+    
+    # Look for log files related to this run
+    if logs_dir.exists():
+        for log_file in logs_dir.glob(f"*{run_id}*.log"):
+            try:
+                with open(log_file, 'r') as f:
+                    content = f.read()
+                    logs.append({
+                        "file": log_file.name,
+                        "content": content[-5000:] if len(content) > 5000 else content,  # Last 5KB
+                        "size": log_file.stat().st_size,
+                        "modified": log_file.stat().st_mtime
+                    })
+            except Exception as e:
+                logger.error(f"Error reading log file {log_file}: {e}")
+    
+    # Also check for pytest output logs
+    pytest_log = Path("artifacts") / f"pytest_{run_id}.log"
+    if pytest_log.exists():
+        try:
+            with open(pytest_log, 'r') as f:
+                content = f.read()
+                logs.append({
+                    "file": f"pytest_{run_id}.log",
+                    "content": content[-5000:] if len(content) > 5000 else content,
+                    "size": pytest_log.stat().st_size,
+                    "modified": pytest_log.stat().st_mtime
+                })
+        except Exception as e:
+            logger.error(f"Error reading pytest log: {e}")
+    
+    return logs
+
+
+def _get_run_reports(run_id: str) -> List[Dict[str, Any]]:
+    """Get test reports for a run"""
+    reports = []
+    reports_dir = Path("reports")
+    
+    # Look for Allure reports
+    allure_dir = reports_dir / "allure-results"
+    if allure_dir.exists():
+        allure_files = list(allure_dir.glob("*.json")) + list(allure_dir.glob("*.txt"))
+        if allure_files:
+            reports.append({
+                "type": "allure",
+                "name": "Allure Test Results",
+                "path": str(allure_dir),
+                "files": [f.name for f in allure_files],
+                "url": f"/reports/allure-results/"
+            })
+    
+    # Look for HTML reports
+    for html_file in reports_dir.glob("*.html"):
+        reports.append({
+            "type": "html",
+            "name": html_file.stem.replace('_', ' ').title(),
+            "path": str(html_file),
+            "url": f"/reports/{html_file.name}",
+            "size": html_file.stat().st_size,
+            "modified": html_file.stat().st_mtime
+        })
+    
+    # Look for JUnit XML reports
+    for xml_file in reports_dir.glob("*.xml"):
+        reports.append({
+            "type": "junit",
+            "name": xml_file.stem.replace('_', ' ').title(),
+            "path": str(xml_file),
+            "url": f"/reports/{xml_file.name}",
+            "size": xml_file.stat().st_size,
+            "modified": xml_file.stat().st_mtime
+        })
+    
+    return reports
 
 
 @app.get("/api/metrics")

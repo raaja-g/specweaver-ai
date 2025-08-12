@@ -1,11 +1,17 @@
 version: "1.0"
 models:
-  local: llama3.2            # Ollama/vLLM local model
+  local: gemma3:12b        # Ollama/vLLM local model
   groq: compound-beta        # Groq hosted model (requested)
   gemini: gemini-2.5-pro     # Google Gemini model
   openai: gpt-4.1-nano        # OpenAI model
 
 routing:
   enable_local: false
-  order: [groq, gemini, openai]
+  # User can change this order to prioritize different LLM providers
+  # Available options: groq, gemini, openai, local (if enable_local: true)
+  order: [gemini, groq, openai]
+  
+  # Fallback settings
+  max_retries: 3
+  timeout_seconds: 30
 

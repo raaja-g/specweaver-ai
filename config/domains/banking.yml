@@ -1,0 +1,79 @@
+domain: banking
+description: Banking and financial services applications
+
+context: |
+  This is a banking application where users can manage accounts, transfer money,
+  pay bills, view statements, and perform various financial transactions.
+  Focus on security, compliance, transaction accuracy, and user experience.
+
+functional_areas:
+  - Account Dashboard
+  - Login & Authentication
+  - Account Management
+  - Money Transfers
+  - Bill Payments
+  - Transaction History
+  - Card Management
+  - Loan Applications
+  - Investment Services
+  - Customer Support
+  - Security & Compliance
+  - Mobile Banking
+
+example_features: |
+  Feature: Account Login & Authentication
+  As a bank customer
+  I want to securely log into my account
+  So that I can access my financial information safely
+
+  Background:
+  Given the banking website is available
+
+  Scenario: Successful login with valid credentials
+  When I enter my username "john.doe" and password
+  And I complete two-factor authentication
+  Then I am logged into my account dashboard
+  And I see my account balances
+
+  Scenario Outline: Failed login attempts
+  When I enter username "<username>" and password "<password>"
+  Then I see error message "<error>"
+  And my account is not accessed
+  Examples:
+  | username    | password | error                    |
+  | invalid     | valid    | Invalid username         |
+  | valid       | invalid  | Invalid password         |
+  | locked_user | valid    | Account temporarily locked |
+
+  ---
+
+  Feature: Money Transfer
+  As a bank customer
+  I want to transfer money between accounts
+  So that I can manage my finances effectively
+
+  Background:
+  Given I am logged into my bank account
+
+  Scenario: Transfer money to another account
+  When I select "Transfer Money"
+  And I choose source account "Checking - *1234"
+  And I enter destination account "5678901234567890"
+  And I enter amount "$500.00"
+  And I confirm the transfer
+  Then the transfer is processed successfully
+  And I receive a confirmation number
+
+realistic_data:
+  account_numbers:
+    - "1234567890"
+    - "0987654321"
+    - "1111222233"
+  amounts:
+    - "$100.00"
+    - "$500.00"
+    - "$1,000.00"
+  usernames:
+    - john.doe
+    - jane.smith
+    - mike.wilson

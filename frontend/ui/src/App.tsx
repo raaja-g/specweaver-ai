@@ -1,361 +1,978 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link, Route, Routes, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Bar, Line } from 'react-chartjs-2';
-import hljs from 'highlight.js/lib/core';
-import diffLang from 'highlight.js/lib/languages/diff';
-import 'highlight.js/styles/atom-one-dark.css';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
-  BarElement,
   PointElement,
   LineElement,
   Title,
   Tooltip,
   Legend,
 } from 'chart.js';
+import { Line } from 'react-chartjs-2';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend);
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
+import highlight from 'highlight.js';
+import 'highlight.js/styles/github.css';
 
-type TestCaseSummary = { id: string; title: string; type: string; priority: string; trace_to: string[] };
-type Duplicate = { file: string; reason: string };
-
-function Nav() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 16px', borderBottom: '1px solid #eee' }}>
-      <div style={{ fontSize: 28, fontWeight: 800 }}>SpecWeaver</div>
-      <Link to="/" style={{ textDecoration: 'none' }}>Dashboard</Link>
-      <Link to="/generate" style={{ textDecoration: 'none' }}>Test Generation</Link>
-      <Link to="/runs" style={{ textDecoration: 'none' }}>Runs</Link>
-    </div>
-  );
+// Types
+interface Requirement {
+  session_id: string;
+  requirement_id: string;
+  title: string;
+  actor: string;
+  goal: string;
+  ac_count: number;
+  status: string;
 }
 
-function Dashboard({ metrics }: { metrics: any }) {
-  const chartData = useMemo(() => {
-    if (!metrics) return { labels: [], datasets: [] };
-    const labels = Object.keys(metrics.test_types || {});
-    const data = Object.values(metrics.test_types || {});
-    return {
-      labels,
-      datasets: [
-        { label: 'Test Types Count', backgroundColor: 'rgba(99, 102, 241, 0.6)', data },
-      ],
-    };
-  }, [metrics]);
-  const timeSeries = useMemo(() => {
-    if (!metrics?.history) return { labels: [], datasets: [] };
-    const labels = metrics.history.map((m: any) => (m.completed_at || m.created_at || '').slice(11, 19));
-    const data = metrics.history.map((m: any) => (m.status === 'completed' ? 1 : 0));
-    return { labels, datasets: [{ label: 'Pass (1=yes)', data, borderColor: 'rgba(16,185,129,1)', backgroundColor: 'rgba(16,185,129,0.2)' }] };
-  }, [metrics]);
-  return (
-    <div style={{ display: 'flex', gap: 16 }}>
-      <div style={{ flex: 1 }}>
-        <h3>Current Run Distribution</h3>
-        <div style={{ height: 300 }}>
-          <Bar data={chartData as any} options={{ responsive: true, plugins: { legend: { display: false } } }} />
-        </div>
-      </div>
-      <div style={{ flex: 1 }}>
-        <h3>Pass Trend (recent runs)</h3>
-        <div style={{ height: 240 }}>
-          <Line data={timeSeries as any} options={{ responsive: true }} />
-        </div>
-        <div style={{ marginTop: 8 }}>Pass rate: {metrics?.pass_rate?.toFixed?.(1) ?? 0}%</div>
-      </div>
-    </div>
-  );
+interface Step {
+  action: string;
+  params?: Record<string, any>;
 }
 
-export default function App() {
-  const [story, setStory] = useState('');
-  const [session, setSession] = useState<string | null>(null);
-  const [tests, setTests] = useState<TestCaseSummary[]>([]);
-  const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [duplicates, setDuplicates] = useState<Duplicate[]>([]);
-  const [uiMode, setUiMode] = useState<'real' | 'mock'>('real');
-  const [apiMode, setApiMode] = useState<'mock' | 'stub' | 'real'>('mock');
-  const [autoPR, setAutoPR] = useState<boolean>(false);
-  const [runId, setRunId] = useState<string | null>(null);
-  const [runStatus, setRunStatus] = useState<any>(null);
-  const [metrics, setMetrics] = useState<any>(null);
-  const [allowDup, setAllowDup] = useState<boolean>(false);
-  const [diffs, setDiffs] = useState<any[] | null>(null);
-  const [showDiffs, setShowDiffs] = useState<boolean>(false);
+interface TestCase {
+  id: string;
+  title: string;
+  type: string;
+  priority: string;
+  trace_to: string[];
+  preconditions?: string[];
+  steps?: Step[];
+  data?: { examples?: Array<Record<string, any>> };
+}
+
+interface TestSuite {
+  session_id: string;
+  test_count: number;
+  coverage: any;
+  test_cases: TestCase[];
+  duplicates: any[];
+}
+
+interface RunStatus {
+  id: string;
+  status: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
+  output?: string;
+  errors?: string;
+  exit_code?: number;
+}
+
+interface Metrics {
+  total_requirements: number;
+  total_runs: number;
+  pass_rate: number;
+  recent_runs: any[];
+  test_types: any;
+  history: any[];
+}
+
+// Dashboard Component
+const Dashboard: React.FC = () => {
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    hljs.registerLanguage('diff', diffLang);
+    const fetchMetrics = async (isInitialLoad = false) => {
+      try {
+        const response = await axios.get('http://localhost:8080/api/metrics');
+        setMetrics(response.data);
+      } catch (error) {
+        console.error('Failed to fetch metrics:', error);
+      } finally {
+        if (isInitialLoad) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchMetrics(true); // Initial load
+    const interval = setInterval(() => fetchMetrics(false), 30000); // Background refresh
+    return () => clearInterval(interval);
   }, []);
 
-  const api = 'http://localhost:8080';
-  const navigate = useNavigate();
+  if (loading) return <div className="p-6">Loading dashboard...</div>;
 
-  const upload = async () => {
-    const res = await axios.post(`${api}/api/requirements`, { story_text: story });
-    setSession(res.data.session_id);
+  if (!metrics) return <div className="p-6 text-red-600">Failed to load metrics</div>;
+
+  const chartData = {
+    labels: metrics.history.slice(-10).map((h: any) => new Date(h.created_at).toLocaleDateString()),
+    datasets: [{
+      label: 'Test Runs',
+      data: metrics.history.slice(-10).map((h: any) => h.status === 'completed' ? 1 : 0),
+      borderColor: 'rgb(75, 192, 192)',
+      backgroundColor: 'rgba(75, 192, 192, 0.2)',
+      tension: 0.1
+    }]
   };
 
-  const generate = async () => {
-    if (!session) return;
-    try {
-      const res = await axios.post(`${api}/api/requirements/${session}/generate`, {
-        coverage: 'comprehensive',
-        allow_duplicates: allowDup,
-      });
-      setTests(res.data.test_cases);
-      setDuplicates(res.data.duplicates || []);
-      setSelected(Object.fromEntries(res.data.test_cases.map((t: TestCaseSummary) => [t.id, true])));
-    } catch (e: any) {
-      if (e.response?.status === 409) {
-        setDuplicates(e.response.data.detail?.duplicates || []);
-        alert('Duplicate tests found. Enable Allow duplicates or refine selection.');
-      } else {
-        alert('Generate failed');
-      }
+  return (
+    <div className="p-6">
+      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+      
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold text-gray-700">Total Requirements</h3>
+          <p className="text-3xl font-bold text-blue-600">{metrics.total_requirements}</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold text-gray-700">Total Runs</h3>
+          <p className="text-3xl font-bold text-green-600">{metrics.total_runs}</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold text-gray-700">Pass Rate</h3>
+          <p className="text-3xl font-bold text-purple-600">{metrics.pass_rate.toFixed(1)}%</p>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-semibold text-gray-700">UI Real Mode</h3>
+          <p className="text-3xl font-bold text-orange-600">{metrics.test_types.ui_real}</p>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-semibold mb-4">Test Run Trends</h3>
+        <div className="h-64">
+          <Line data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
+        </div>
+      </div>
+
+      {/* Recent Runs */}
+      <div className="bg-white p-6 rounded-lg shadow mt-6">
+        <h3 className="text-lg font-semibold mb-4">Recent Test Runs</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left p-2">ID</th>
+                <th className="text-left p-2">Status</th>
+                <th className="text-left p-2">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {metrics.recent_runs.map((run: any) => (
+                <tr key={run.id} className="border-b">
+                  <td className="p-2 font-mono text-sm">{run.id.slice(0, 8)}...</td>
+                  <td className="p-2">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      run.status === 'completed' ? 'bg-green-100 text-green-800' :
+                      run.status === 'failed' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {run.status}
+                    </span>
+                  </td>
+                  <td className="p-2 text-sm">{new Date(run.created_at).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Test Generation Component
+const TestGeneration: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'text' | 'file'>('text');
+  const [storyText, setStoryText] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [allowDuplicates, setAllowDuplicates] = useState(false);
+  const [currentStep, setCurrentStep] = useState<'input' | 'parsing' | 'parsed' | 'generating' | 'approving' | 'synthesizing' | 'running'>('input');
+  
+  const [requirement, setRequirement] = useState<Requirement | null>(null);
+  const [testSuite, setTestSuite] = useState<TestSuite | null>(null);
+  const [selectedTests, setSelectedTests] = useState<string[]>([]);
+  const [runStatus, setRunStatus] = useState<RunStatus | null>(null);
+  const [uiMode, setUiMode] = useState('real');
+  const [apiMode, setApiMode] = useState('mock');
+  const [autoPR, setAutoPR] = useState(false);
+  const [autoGenerateCode, setAutoGenerateCode] = useState(false);
+  const [codeGenerated, setCodeGenerated] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const STORAGE_KEY = 'sw_test_gen_state_v1';
+  // Auto-dismiss toasts
+  useEffect(() => {
+    if (success !== null) {
+      const t = setTimeout(() => setSuccess(null), 8000);
+      return () => clearTimeout(t);
     }
-  };
+  }, [success, setSuccess]);
+  useEffect(() => {
+    if (error !== null) {
+      const t = setTimeout(() => setError(null), 8000);
+      return () => clearTimeout(t);
+    }
+  }, [error, setError]);
 
-  const approve = async () => {
-    if (!session) return;
-    const ids = tests.filter(t => selected[t.id]).map(t => t.id);
-    // Request preview diffs first
+  // Persist and hydrate wizard state so stages are sticky across navigation
+  useEffect(() => {
     try {
-      const pv = await axios.post(`${api}/api/requirements/${session}/preview`, { test_case_ids: ids });
-      setDiffs(pv.data.diffs || []);
-      setShowDiffs(true);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        setActiveTab(s.activeTab ?? 'text');
+        setStoryText(s.storyText ?? '');
+        setAllowDuplicates(!!s.allowDuplicates);
+        setCurrentStep(s.currentStep ?? 'input');
+        setRequirement(s.requirement ?? null);
+        setTestSuite(s.testSuite ?? null);
+        setSelectedTests(s.selectedTests ?? []);
+        setRunStatus(s.runStatus ?? null);
+        setUiMode(s.uiMode ?? 'real');
+        setApiMode(s.apiMode ?? 'mock');
+        setAutoPR(!!s.autoPR);
+        setAutoGenerateCode(!!s.autoGenerateCode);
+        setCodeGenerated(!!s.codeGenerated);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const s = {
+      activeTab,
+      storyText,
+      allowDuplicates,
+      currentStep,
+      requirement,
+      testSuite,
+      selectedTests,
+      runStatus,
+      uiMode,
+      apiMode,
+      autoPR,
+      autoGenerateCode,
+      codeGenerated,
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
+  }, [activeTab, storyText, allowDuplicates, currentStep, requirement, testSuite, selectedTests, runStatus, uiMode, apiMode, autoPR, autoGenerateCode, codeGenerated]);
+
+  // Step 1: Parse requirement
+  const handleParse = async () => {
+    if (!storyText.trim() && !file) {
+      setError('Please enter text or upload a file');
       return;
-    } catch (e) {
-      // fallback to immediate approve if preview not available
     }
+
+    setCurrentStep('parsing');
+    setError(null);
+    setSuccess(null);
+    // Reset prior session artifacts
+    setRequirement(null);
+    setTestSuite(null);
+    setSelectedTests([]);
+    setRunStatus(null);
+    setCodeGenerated(false);
+
     try {
-      await axios.post(`${api}/api/requirements/${session}/approve`, {
-        test_case_ids: ids,
-        approved: true,
-        allow_duplicates: allowDup,
-      });
-      alert('Approved and generated tests.');
-    } catch (e: any) {
-      if (e.response?.status === 409) {
-        setDuplicates(e.response.data.detail?.duplicates || []);
-        alert('Duplicate tests found. Enable Allow duplicates or change selection.');
-      } else {
-        alert('Approve failed');
+      let response;
+      if (activeTab === 'text') {
+        response = await axios.post('http://localhost:8080/api/requirements', {
+          story_text: storyText,
+          tags: ['poc']
+        });
+      } else if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('tags', 'poc');
+        response = await axios.post('http://localhost:8080/api/requirements/file', formData);
       }
+
+              setRequirement(response.data);
+        setCurrentStep('parsed');
+        setSuccess('Requirement parsed successfully! View the parsed details below.');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to parse requirement');
+      setCurrentStep('input');
     }
   };
 
-  const confirmApprove = async () => {
-    if (!session) return;
-    const ids = tests.filter(t => selected[t.id]).map(t => t.id);
+  // Step 2: Generate tests
+  const handleGenerate = async () => {
+    if (!requirement) return;
+
+    setCurrentStep('generating');
+    setError(null);
+
     try {
-      await axios.post(`${api}/api/requirements/${session}/approve`, {
-        test_case_ids: ids,
-        approved: true,
-        allow_duplicates: allowDup,
+      const response = await axios.post(`http://localhost:8080/api/requirements/${requirement.session_id}/generate`, {
+        requirement_id: requirement.requirement_id,
+        coverage: 'comprehensive',
+        allow_duplicates: allowDuplicates
       });
-      setShowDiffs(false);
-      alert('Approved and generated tests.');
-    } catch (e: any) {
-      if (e.response?.status === 409) {
-        setDuplicates(e.response.data.detail?.duplicates || []);
-        alert('Duplicate tests found. Enable Allow duplicates or change selection.');
-      } else {
-        alert('Approve failed');
-      }
+
+      setTestSuite(response.data);
+      setCurrentStep('approving');
+      setSuccess('Tests generated successfully!');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to generate tests');
+      setCurrentStep('generating');
     }
   };
 
-  const run = async () => {
-    if (!session) return;
-    const res = await axios.post(`${api}/api/runs`, {
-      session_id: session,
+  // Step 3: Approve tests
+  const handleApprove = async () => {
+    if (!requirement || !testSuite || selectedTests.length === 0) {
+      setError('Please select tests to approve');
+      return;
+    }
+
+    setCurrentStep('approving');
+    setError(null);
+
+    try {
+      const response = await axios.post(`http://localhost:8080/api/requirements/${requirement.session_id}/approve`, {
+        requirement_id: requirement.requirement_id,
+        test_case_ids: selectedTests,
+        approved: true,
+        allow_duplicates: allowDuplicates
+      });
+
+      setCurrentStep('synthesizing');
+      setSuccess('Tests approved! Code generated.');
+      setCodeGenerated(true);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to approve tests');
+      setCurrentStep('approving');
+    }
+  };
+
+  // Step 4: Run tests
+  const handleRun = async () => {
+    if (!requirement) return;
+
+    setCurrentStep('running');
+    setError(null);
+
+    try {
+      const response = await axios.post('http://localhost:8080/api/runs', {
+        session_id: requirement.session_id,
       ui_mode: uiMode,
       api_mode: apiMode,
-      auto_pr: autoPR,
-    });
-    setRunId(res.data.run_id);
-    setRunStatus({ status: 'queued' });
+        auto_pr: autoPR
+      });
+
+      setRunStatus(response.data);
+      setSuccess('Tests started! Check status below.');
+      setCurrentStep('input'); // Reset to start
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to start tests');
+      setCurrentStep('synthesizing');
+    }
   };
 
-  // Poll run status
-  useEffect(() => {
-    if (!runId) return;
-    const interval = setInterval(async () => {
-      try {
-        // Ask API to refresh from artifacts if worker is used
-        await axios.post(`${api}/api/runs/${runId}/refresh`);
-        const res = await axios.get(`${api}/api/runs/${runId}`);
-        setRunStatus(res.data);
-        if (["completed", "failed", "error"].includes(res.data.status)) {
-          clearInterval(interval);
-        }
-      } catch {
-        // ignore
-      }
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [runId]);
-
-  // Fetch dashboard metrics
-  const fetchMetrics = async () => {
-    const res = await axios.get(`${api}/api/metrics`);
-    setMetrics(res.data);
+  const handleTestSelection = (testId: string) => {
+    setSelectedTests(prev => 
+      prev.includes(testId) 
+        ? prev.filter(id => id !== testId)
+        : [...prev, testId]
+    );
   };
-  useEffect(() => { fetchMetrics(); }, [runStatus?.status]);
 
-  const chartData = useMemo(() => {
-    if (!metrics) return { labels: [], datasets: [] };
-    const labels = Object.keys(metrics.test_types || {});
-    const data = Object.values(metrics.test_types || {});
-    return {
-      labels,
-      datasets: [
-        {
-          label: 'Test Types Count',
-          backgroundColor: 'rgba(99, 102, 241, 0.6)',
-          data,
-        },
-      ],
-    };
-  }, [metrics]);
+  const canProceedToGenerate = requirement && currentStep === 'generating';
+  const canProceedToApprove = testSuite && currentStep === 'approving';
+  const canProceedToRun = requirement && currentStep === 'synthesizing';
 
-  const timeSeries = useMemo(() => {
-    if (!metrics?.history) return { labels: [], datasets: [] };
-    const labels = metrics.history.map((m: any) => (m.completed_at || m.created_at || '').slice(11, 19));
-    const data = metrics.history.map((m: any) => (m.status === 'completed' ? 1 : 0));
-    return {
-      labels,
-      datasets: [
-        { label: 'Pass (1=yes)', data, borderColor: 'rgba(16,185,129,1)', backgroundColor: 'rgba(16,185,129,0.2)' },
-      ],
-    };
-  }, [metrics]);
+  // Reset all wizard state
+  const handleReset = () => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    setActiveTab('text');
+    setStoryText('');
+    setFile(null);
+    setAllowDuplicates(false);
+    setCurrentStep('input');
+    setRequirement(null);
+    setTestSuite(null);
+    setSelectedTests([]);
+    setRunStatus(null);
+    setUiMode('real');
+    setApiMode('mock');
+    setAutoPR(false);
+    setAutoGenerateCode(false);
+    setCodeGenerated(false);
+    setError(null);
+    setSuccess(null);
+  };
 
-  const GeneratePage = () => (
-    <div>
-      <h2>Create Requirement</h2>
-          <textarea rows={8} cols={80} placeholder="Paste user story..." value={story} onChange={e => setStory(e.target.value)} />
-          <div style={{ marginTop: 8 }}>
-            <button onClick={upload}>1) Upload & Parse</button>
-            <label style={{ marginLeft: 12 }}>
-              <input type="checkbox" checked={allowDup} onChange={e => setAllowDup(e.target.checked)} /> Allow duplicates
-            </label>
-            <button onClick={generate} disabled={!session} style={{ marginLeft: 12 }}>2) Generate Tests</button>
-            <button onClick={() => { if (tests.length) approve(); }} disabled={!tests.length} style={{ marginLeft: 12 }}>Generate tests + code</button>
+  return (
+    <div className="p-6">
+      <h1 className="text-3xl font-bold mb-6">Test Generation</h1>
+
+             {/* Progress Steps */}
+       <div className="mb-8">
+          <div className="flex items-center justify-between">
+            {['Input', 'Parse', 'View Parsed', 'Generate Tests', 'Approve', 'Generate Code', 'Run'].map((step, index) => {
+              const stepOrder: Record<string, number> = {
+                'Input': 0,
+                'Parse': 1,
+                'View Parsed': 2,
+                'Generate Tests': 3,
+                'Approve': 4,
+                'Generate Code': 5,
+                'Run': 6,
+              };
+              const currentOrder: Record<typeof currentStep, number> = {
+                input: 0,
+                parsing: 1,
+                parsed: 2,
+                generating: 3,
+                approving: 4,
+                synthesizing: 5,
+                running: 6,
+              };
+              const isActive = currentOrder[currentStep] === index;
+              const isCompleted = currentOrder[currentStep] > index || (index === 5 && codeGenerated);
+              return (
+                <div key={step} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    isActive ? 'bg-blue-600 text-white' : isCompleted ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {index + 1}
+                  </div>
+                  <span className={`ml-2 text-sm font-medium ${isCompleted ? 'text-green-700' : ''}`}>{step}</span>
+                  {index < 6 && <div className={`w-16 h-0.5 ml-2 ${isCompleted ? 'bg-green-400' : 'bg-gray-200'}`} />}
+                </div>
+              );
+            })}
+          </div>
           </div>
 
-          <h3 style={{ marginTop: 16 }}>HIL Review & Approval</h3>
-          {duplicates.length > 0 && (
-            <div style={{ color: '#b91c1c', marginBottom: 8 }}>
-              Duplicates detected:
-              <ul>
-                {duplicates.map((d, i) => (
-                  <li key={i}>{d.reason} in {d.file}</li>
-                ))}
-              </ul>
+      {/* Error/Success Messages */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded flex justify-between items-start">
+          <span>{success}</span>
+          <button onClick={() => setSuccess(null)} className="ml-4 text-green-900 hover:text-green-700">✕</button>
+        </div>
+      )}
+
+      {/* Input Section */}
+      <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 className="text-xl font-semibold mb-4">Step 1: Input Requirement</h2>
+        
+        {/* Tabs */}
+        <div className="flex border-b mb-4">
+          <button
+            className={`px-4 py-2 ${activeTab === 'text' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+            onClick={() => setActiveTab('text')}
+          >
+            Text Input
+          </button>
+          <button
+            className={`px-4 py-2 ${activeTab === 'file' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+            onClick={() => setActiveTab('file')}
+          >
+            File Upload
+          </button>
+        </div>
+
+        {activeTab === 'text' ? (
+          <div>
+            <textarea
+              value={storyText}
+              onChange={(e) => setStoryText(e.target.value)}
+              placeholder="Enter your user story here..."
+              className="w-full h-32 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={currentStep !== 'input'}
+            />
+          </div>
+        ) : (
+          <div>
+            <input
+              type="file"
+              accept=".txt,.md,.docx,.pdf"
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              className="w-full p-3 border border-gray-300 rounded-md"
+              disabled={currentStep !== 'input'}
+            />
+            <p className="text-sm text-gray-500 mt-2">Supported: .txt, .md, .docx, .pdf</p>
+          </div>
+        )}
+
+                 <div className="mt-4 space-y-3">
+           <div className="flex items-center">
+             <label className="flex items-center">
+               <input
+                 type="checkbox"
+                 checked={allowDuplicates}
+                 onChange={(e) => setAllowDuplicates(e.target.checked)}
+                 className="mr-2"
+                 disabled={currentStep !== 'input'}
+               />
+               Allow duplicates
+             </label>
+           </div>
+           <div className="flex items-center">
+             <label className="flex items-center">
+               <input
+                 type="checkbox"
+                 checked={autoGenerateCode}
+                 onChange={(e) => setAutoGenerateCode(e.target.checked)}
+                 className="mr-2"
+                 disabled={currentStep !== 'input'}
+               />
+               Auto-generate code after test approval
+             </label>
+           </div>
+         </div>
+
+        <button
+          onClick={handleParse}
+          disabled={currentStep !== 'input' || (!storyText.trim() && !file)}
+          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+        >
+          {currentStep === 'parsing' ? 'Parsing...' : 'Parse Requirement'}
+        </button>
+        <button
+          onClick={handleReset}
+          className="mt-4 ml-3 px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+        >
+          Reset
+        </button>
+      </div>
+
+             {/* View Parsed Requirement Section */}
+       {currentStep === 'parsed' && requirement && (
+         <div className="bg-white p-6 rounded-lg shadow mb-6">
+           <h2 className="text-xl font-semibold mb-4">Step 2: View Parsed Requirement</h2>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+             <div>
+               <h3 className="font-semibold text-gray-700">Requirement Details</h3>
+               <div className="mt-2 space-y-2">
+                 <p><strong>Title:</strong> {requirement.title}</p>
+                 <p><strong>Actor:</strong> {requirement.actor}</p>
+                 <p><strong>Goal:</strong> {requirement.goal}</p>
+                 <p><strong>Acceptance Criteria:</strong> {requirement.ac_count}</p>
+                 <p><strong>Session ID:</strong> <code className="text-xs bg-gray-100 p-1 rounded">{requirement.session_id}</code></p>
+               </div>
+             </div>
+             <div>
+               <h3 className="font-semibold text-gray-700">Original Input</h3>
+               <div className="mt-2 p-3 bg-gray-50 rounded border">
+                 <p className="text-sm text-gray-700">{storyText || (file ? `File: ${file.name}` : 'No input provided')}</p>
+               </div>
+             </div>
+           </div>
+           <button
+             onClick={handleGenerate}
+             className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+           >
+             Generate Tests
+           </button>
+         </div>
+       )}
+
+       {/* Generate Tests Section */}
+       {canProceedToGenerate && (
+         <div className="bg-white p-6 rounded-lg shadow mb-6">
+           <h2 className="text-xl font-semibold mb-4">Step 3: Generate Tests</h2>
+           <p className="text-gray-600 mb-4">
+             Requirement: <strong>{requirement.title}</strong> ({requirement.ac_count} acceptance criteria)
+           </p>
+           <button
+             onClick={handleGenerate}
+             disabled={currentStep !== 'generating'}
+             className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+           >
+             {currentStep === 'generating' ? 'Generating...' : 'Generate Tests'}
+           </button>
             </div>
           )}
-          <div style={{ maxHeight: 240, overflow: 'auto', border: '1px solid #eee' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th align="left">Approve</th>
-                  <th align="left">ID</th>
-                  <th align="left">Title</th>
-                  <th align="left">Type</th>
-                  <th align="left">Priority</th>
+
+                    {/* Approve Tests Section */}
+       {canProceedToApprove && testSuite && (
+         <div className="bg-white p-6 rounded-lg shadow mb-6">
+           <h2 className="text-xl font-semibold mb-4">Step 4: Review & Approve Tests</h2>
+           <p className="text-gray-600 mb-4">
+             Generated {testSuite.test_count} test cases
+           </p>
+           
+           {/* BDD Test Preview - Table View */}
+           <div className="mb-6">
+             <div className="flex justify-between items-center mb-3">
+               <h3 className="text-lg font-semibold">BDD Test Preview</h3>
+               <div className="flex gap-2">
+                 <button
+                   onClick={() => {
+                     const allIds = testSuite.test_cases.map(tc => tc.id);
+                     setSelectedTests(allIds);
+                   }}
+                   className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                 >
+                   Select All
+                 </button>
+                 <button
+                   onClick={() => setSelectedTests([])}
+                   className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+                 >
+                   Clear All
+                 </button>
+               </div>
+             </div>
+             
+             <div className="overflow-x-auto">
+               <table className="min-w-full border border-gray-200">
+                 <thead className="bg-gray-50">
+                   <tr>
+                     <th className="p-3 border text-left w-16">
+                       <input
+                         type="checkbox"
+                         checked={selectedTests.length === testSuite.test_cases.length}
+                         onChange={(e) => {
+                           if (e.target.checked) {
+                             setSelectedTests(testSuite.test_cases.map(tc => tc.id));
+                           } else {
+                             setSelectedTests([]);
+                           }
+                         }}
+                       />
+                     </th>
+                     <th className="p-3 border text-left font-semibold">TC ID</th>
+                     <th className="p-3 border text-left font-semibold">Test Scenario</th>
+                      <th className="p-3 border text-left font-semibold">BDD Test</th>
+                     <th className="p-3 border text-left font-semibold">Priority</th>
+                     <th className="p-3 border text-left font-semibold">Type</th>
                 </tr>
               </thead>
               <tbody>
-                {tests.map(t => (
-                  <tr key={t.id}>
-                    <td><input type="checkbox" checked={!!selected[t.id]} onChange={e => setSelected({ ...selected, [t.id]: e.target.checked })} /></td>
-                    <td>{t.id}</td>
-                    <td title={t.title}>{t.title}</td>
-                    <td>{t.type}</td>
-                    <td>{t.priority}</td>
+                    {testSuite.test_cases.map((test) => (
+                     <tr key={test.id} className="hover:bg-gray-50">
+                       <td className="p-3 border">
+                         <input
+                           type="checkbox"
+                           checked={selectedTests.includes(test.id)}
+                           onChange={() => handleTestSelection(test.id)}
+                         />
+                       </td>
+                       <td className="p-3 border font-mono text-sm">{test.id}</td>
+                       <td className="p-3 border">{test.title}</td>
+                       <td className="p-3 border">
+                          <div className="font-mono text-xs bg-gray-100 p-2 rounded max-w-md">
+                            <div className="text-green-600">Feature: {test.title.split(':')[0]}</div>
+                            {/* Background intentionally omitted in preview */}
+                            {/* Scenario title */}
+                            <div className="text-blue-600 font-semibold">Scenario: {(test.data as any)?.scenario_name || test.title.split(':')[1] || test.title}</div>
+                            {/* Specific BDD lines from raw_steps */}
+                            <div className="text-gray-700 mt-1">
+                              {Array.isArray((test as any).data?.raw_steps) ? (
+                                (test as any).data.raw_steps.map((line: string, idx: number) => (
+                                  <div key={idx} className="mb-1">{line}</div>
+                                ))
+                              ) : (
+                                <>
+                                  <div>Given the site is available</div>
+                                  <div>When I navigate to the homepage</div>
+                                  <div>Then I see primary navigation, search, and banners</div>
+                                </>
+                              )}
+                              {/* Examples */}
+                              {Array.isArray((test as any).data?.examples) && (
+                                <div className="mt-2 text-xs">
+                                  <div className="text-gray-600">Examples:</div>
+                                  <div className="bg-white p-1 rounded border">
+                                    {(test as any).data.examples.slice(0, 3).map((example: any, idx: number) => (
+                                      <div key={idx} className="text-gray-700">
+                                        {Object.entries(example).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                       </td>
+                       <td className="p-3 border">
+                         <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
+                           {test.priority}
+                         </span>
+                       </td>
+                       <td className="p-3 border">
+                         <span className={`px-2 py-1 rounded text-xs ${
+                           test.type === 'positive' ? 'bg-green-100 text-green-800' :
+                           test.type === 'negative' ? 'bg-red-100 text-red-800' :
+                           'bg-yellow-100 text-yellow-800'
+                         }`}>
+                           {test.type}
+                         </span>
+                       </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <button onClick={approve} disabled={!tests.length} style={{ marginTop: 8 }}>3) Approve Selected</button>
+           </div>
 
-          {showDiffs && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ width: '80%', maxHeight: '80%', overflow: 'auto', background: 'white', padding: 16, borderRadius: 8 }}>
-                <h3>Preview diffs</h3>
-                {diffs?.length ? (
-                  diffs.map((d, i) => (
-                    <div key={i} style={{ marginBottom: 16 }}>
-                      <div><b>{d.type}</b> {d.exists ? '(update)' : '(new)'} — {d.preview_path}</div>
-                      <pre style={{ background: '#0f172a', color: '#e2e8f0', padding: 8, overflow: 'auto' }}>
-                        <code className="language-diff" dangerouslySetInnerHTML={{ __html: hljs.highlight(d.diff || 'No existing file to diff', { language: 'diff' }).value }} />
-                      </pre>
-                    </div>
-                  ))
-                ) : (
-                  <div>No diffs available</div>
-                )}
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button onClick={() => setShowDiffs(false)}>Cancel</button>
-                  <button onClick={confirmApprove}>Confirm Approve</button>
-                </div>
-              </div>
-            </div>
-          )}
+           <button
+             onClick={handleApprove}
+             disabled={selectedTests.length === 0}
+             className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+           >
+             Approve Selected Tests
+           </button>
+         </div>
+       )}
 
-          <h3 style={{ marginTop: 16 }}>Run</h3>
+             {/* Run Tests Section */}
+       {canProceedToRun && (
+         <div className="bg-white p-6 rounded-lg shadow mb-6">
+           <h2 className="text-xl font-semibold mb-4">Step 6: Run Tests</h2>
+          
+          <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
-            <label>UI Mode: </label>
-            <select value={uiMode} onChange={e => setUiMode(e.target.value as any)}>
-              <option value="real">real</option>
-              <option value="mock">mock</option>
+              <label className="block text-sm font-medium text-gray-700 mb-2">UI Mode:</label>
+              <select
+                value={uiMode}
+                onChange={(e) => setUiMode(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              >
+                <option value="real">Real</option>
+                <option value="mock">Mock</option>
             </select>
-            <label style={{ marginLeft: 12 }}>API Mode: </label>
-            <select value={apiMode} onChange={e => setApiMode(e.target.value as any)}>
-              <option value="mock">mock</option>
-              <option value="stub">stub</option>
-              <option value="real">real</option>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">API Mode:</label>
+              <select
+                value={apiMode}
+                onChange={(e) => setApiMode(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              >
+                <option value="real">Real</option>
+                <option value="mock">Mock</option>
+                <option value="stub">Stub</option>
             </select>
-            <label style={{ marginLeft: 12 }}>
-              <input type="checkbox" checked={autoPR} onChange={e => setAutoPR(e.target.checked)} /> Auto-PR on pass
-            </label>
-            <button style={{ marginLeft: 12 }} onClick={run} disabled={!session}>4) Run</button>
+            </div>
           </div>
-          {runId && (
-            <div style={{ marginTop: 8 }}>
-              <div>Run ID: {runId}</div>
-              <div>Status: {runStatus?.status}</div>
-              {runStatus?.output && (
-                <pre style={{ whiteSpace: 'pre-wrap', background: '#f8fafc', padding: 8, border: '1px solid #eee' }}>{runStatus.output}</pre>
-              )}
+
+          <div className="mb-4">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={autoPR}
+                onChange={(e) => setAutoPR(e.target.checked)}
+                className="mr-2"
+              />
+              Auto-PR on pass
+            </label>
+          </div>
+
+          <button
+            onClick={handleRun}
+            disabled={currentStep !== 'synthesizing'}
+            className="px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            Run Tests
+          </button>
+        </div>
+      )}
+
+             {/* Generated Code Location */}
+       {currentStep === 'synthesizing' && (
+         <div className="bg-white p-6 rounded-lg shadow mb-6">
+           <h2 className="text-xl font-semibold mb-4">Step 5: Code Generated Successfully!</h2>
+           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+             <h3 className="font-semibold text-green-800 mb-2">✅ Code Generation Complete</h3>
+             <p className="text-green-700 mb-3">
+               Your test code has been automatically generated during approval and saved to:
+             </p>
+              <div className="bg-white p-3 rounded border">
+                <p className="font-mono text-sm">
+                  <strong>Directory:</strong> tests/
+                </p>
+               <p className="font-mono text-sm">
+                 <strong>Structure:</strong>
+               </p>
+               <ul className="font-mono text-xs ml-4 mt-1">
+                 <li>📁 <strong>features/</strong> - BDD feature files</li>
+                 <li>&nbsp;&nbsp;&nbsp;• search.feature - Search functionality</li>
+                 <li>&nbsp;&nbsp;&nbsp;• cart.feature - Cart operations</li>
+                 <li>&nbsp;&nbsp;&nbsp;• checkout.feature - Checkout process</li>
+                 <li>📁 <strong>steps/</strong> - Step definitions by area</li>
+                 <li>&nbsp;&nbsp;&nbsp;📁 search/ - Search step definitions</li>
+                 <li>&nbsp;&nbsp;&nbsp;📁 cart/ - Cart step definitions</li>
+                 <li>&nbsp;&nbsp;&nbsp;📁 checkout/ - Checkout step definitions</li>
+                 <li>📄 conftest.py - Shared test fixtures</li>
+                 <li>📄 locators.yml - Shared UI element locators</li>
+               </ul>
+             </div>
+             <p className="text-green-700 mt-3 text-sm">
+               <strong>Note:</strong> Code is generated automatically when you approve tests. 
+               You can now run the tests from Step 6 below.
+             </p>
+           </div>
+         </div>
+       )}
+
+       {/* Run Status */}
+       {runStatus && (
+         <div className="bg-white p-6 rounded-lg shadow">
+           <h2 className="text-xl font-semibold mb-4">Run Status</h2>
+           <div className="bg-gray-50 p-4 rounded mb-4">
+             <p><strong>Run ID:</strong> {runStatus.id}</p>
+             <p><strong>Status:</strong> {runStatus.status}</p>
+             <p><strong>Created:</strong> {new Date(runStatus.created_at).toLocaleString()}</p>
+           </div>
+           
+           {/* Test Logs */}
+           {(runStatus as any).logs && (runStatus as any).logs.length > 0 && (
+             <div className="mb-4">
+               <h3 className="text-lg font-semibold mb-2">📋 Execution Logs</h3>
+               {(runStatus as any).logs.map((log: any, idx: number) => (
+                 <div key={idx} className="mb-3 border rounded">
+                   <div className="bg-gray-200 px-3 py-1 text-sm font-mono flex justify-between">
+                     <span>📄 {log.file}</span>
+                     <span className="text-gray-600">{(log.size / 1024).toFixed(1)} KB</span>
+                   </div>
+                   <pre className="text-xs bg-white p-3 overflow-x-auto max-h-40 border-t">
+                     {log.content}
+                   </pre>
+                 </div>
+               ))}
+             </div>
+           )}
+           
+           {/* Test Reports */}
+           {(runStatus as any).reports && (runStatus as any).reports.length > 0 && (
+             <div className="mb-4">
+               <h3 className="text-lg font-semibold mb-2">📊 Test Reports</h3>
+               <div className="space-y-2">
+                 {(runStatus as any).reports.map((report: any, idx: number) => (
+                   <div key={idx} className="flex items-center justify-between p-3 bg-blue-50 rounded border">
+                     <div>
+                       <span className="font-medium">{report.name}</span>
+                       <span className="ml-2 px-2 py-1 bg-blue-200 text-blue-800 text-xs rounded">
+                         {report.type.toUpperCase()}
+                       </span>
+                       {report.size && (
+                         <span className="ml-2 text-sm text-gray-600">
+                           ({(report.size / 1024).toFixed(1)} KB)
+                         </span>
+                       )}
+                     </div>
+                     <a
+                       href={`http://localhost:8080${report.url}`}
+                       target="_blank"
+                       rel="noopener noreferrer"
+                       className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors"
+                     >
+                       📄 View Report
+                     </a>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           )}
+           
             </div>
           )}
-    </div>
+        </div>
   );
+};
 
-  const DashboardPage = () => (<Dashboard metrics={metrics} />);
-  const RunsPage = () => (
-    <div>
-      <h2>Runs</h2>
-      <pre>{JSON.stringify(metrics?.recent_runs || [], null, 2)}</pre>
-    </div>
-  );
+// Runs Component
+const Runs: React.FC = () => {
+  const [runs, setRuns] = useState<RunStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRuns = async () => {
+      try {
+        // For now, we'll show a placeholder since we need to implement the runs endpoint
+        setRuns([]);
+      } catch (error) {
+        console.error('Failed to fetch runs:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRuns();
+  }, []);
+
+  if (loading) return <div className="p-6">Loading runs...</div>;
 
   return (
-    <div style={{ fontFamily: 'Inter, system-ui, Arial' }}>
-      <Nav />
-      <div style={{ padding: 24 }}>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/generate" element={<GeneratePage />} />
-          <Route path="/runs" element={<RunsPage />} />
-        </Routes>
+    <div className="p-6">
+      <h1 className="text-3xl font-bold mb-6">Test Runs</h1>
+      <div className="bg-white p-6 rounded-lg shadow">
+        <p className="text-gray-600">Run history will be displayed here. This feature is coming soon.</p>
       </div>
     </div>
   );
-}
+};
+
+// Main App Component
+const App: React.FC = () => {
+  const location = useLocation();
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <h1 className="text-2xl font-bold text-gray-900">SpecWeaver</h1>
+            <nav className="flex space-x-8">
+              <Link
+                to="/"
+                className={`text-sm font-medium ${
+                  location.pathname === '/' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Dashboard
+              </Link>
+              <Link
+                to="/generate"
+                className={`text-sm font-medium ${
+                  location.pathname === '/generate' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Test Generation
+              </Link>
+              <Link
+                to="/runs"
+                className={`text-sm font-medium ${
+                  location.pathname === '/runs' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Runs
+              </Link>
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto">
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/generate" element={<TestGeneration />} />
+          <Route path="/runs" element={<Runs />} />
+        </Routes>
+      </main>
+    </div>
+  );
+};
+
+export default App;

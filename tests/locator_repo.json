@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "pages": {
+    "user": {
+      "action": [
+        {
+          "click": "[data-action='action']"
+        }
+      ]
+    },
+    "navigation": {
+      "goto": [
+        {
+          "click": "[data-action='goto']"
+        }
+      ]
+    }
+  },
+  "created_at": "2025-08-12T14:17:29.143984",
+  "auto_generated": true
+}
