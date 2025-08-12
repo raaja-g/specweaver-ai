@@ -10,7 +10,7 @@ import httpx
 from typing import Dict, Any
 
 # Load scenarios from the specific feature file
-FEATURE_FILE = Path(__file__).resolve().parents[2] / "features" / ""
+FEATURE_FILE = Path(__file__).resolve().parents[2] / "features" / "cart.feature"
 scenarios(str(FEATURE_FILE))
 
 
