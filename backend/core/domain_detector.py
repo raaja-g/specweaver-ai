@@ -76,6 +76,8 @@ class DomainDetector:
             return 'banking'  
         elif any(word in url_lower for word in ['health', 'medical', 'hospital']):
             return 'healthcare'
+        elif any(word in url_lower for word in ['google.com', 'search', 'gmail', 'youtube']):
+            return 'generic'
         
         # Check text content
         if any(word in text_lower for word in ecommerce_keywords):
@@ -104,33 +106,50 @@ class DomainDetector:
         # Return generic context if domain not found
         return {
             'domain': 'generic',
-            'description': 'Generic application testing',
-            'context': 'This is a generic application. Focus on core functionality, user experience, and error handling.',
+            'description': 'Generic web application testing',
+            'context': 'This is a generic web application. Focus on core functionality, navigation, user interface, search capabilities, and overall user experience.',
             'functional_areas': [
-                'User Interface',
-                'Core Functionality', 
-                'Data Management',
-                'Security & Access',
-                'Performance',
-                'Error Handling'
+                'Page Loading & Navigation',
+                'Search Functionality', 
+                'User Interface Elements',
+                'Content Display',
+                'Form Interactions',
+                'Error Handling',
+                'Performance & Responsiveness'
             ],
             'example_features': '''
-Feature: Core Functionality
+Feature: Page Navigation
 As a user
-I want the application to work correctly
-So that I can accomplish my tasks
+I want to navigate through the website
+So that I can access different sections
 
 Background:
-Given the application is available
+Given the website is accessible
 
-Scenario: Basic functionality works
-When I use the main features
-Then I get the expected results
-And the system remains stable
+Scenario: Load homepage successfully
+When I navigate to the homepage
+Then the page loads completely
+And all main elements are visible
+
+Scenario: Navigate to different sections
+When I click on navigation links
+Then I am taken to the correct pages
+And the content loads properly
+
+Feature: Search Functionality  
+As a user
+I want to search for information
+So that I can find what I need
+
+Scenario: Perform basic search
+When I enter a search query
+Then I see relevant results
+And the results are properly formatted
             ''',
             'realistic_data': {
-                'users': ['user1', 'user2', 'testuser'],
-                'ids': ['12345', '67890', '11111']
+                'search_queries': ['test query', 'example search', 'sample text'],
+                'navigation_items': ['Home', 'About', 'Contact', 'Services'],
+                'test_data': ['sample input', 'test value', 'example text']
             }
         }
     

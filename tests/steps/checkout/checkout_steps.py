@@ -1,6 +1,6 @@
 """
-Generated step definitions for test the e-commerce website functionality
-Generated at: 2025-08-11T21:58:39.648224
+Generated step definitions for test the application
+Generated at: 2025-08-12T05:52:18.083165
 """
 from pytest_bdd import given, when, then, scenarios, parsers
 from playwright.sync_api import Page, expect

@@ -2,13 +2,39 @@
   "version": 1,
   "pages": {
     "user": {
+      "step": [
+        {
+          "click": "[data-action='step']"
+        }
+      ],
       "action": [
         {
           "click": "[data-action='action']"
         }
       ]
+    },
+    "navigation": {
+      "goto": [
+        {
+          "click": "[data-action='goto']"
+        }
+      ]
+    },
+    "cart": {
+      "apply_coupon": [
+        {
+          "click": "[data-action='apply_coupon']"
+        }
+      ]
+    },
+    "search": {
+      "execute": [
+        {
+          "click": "[data-action='execute']"
+        }
+      ]
     }
   },
-  "created_at": "2025-08-12T02:42:36.726665",
+  "created_at": "2025-08-12T05:52:18.084419",
   "auto_generated": true
 }

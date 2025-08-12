@@ -1,6 +1,6 @@
 """
-Generated step definitions for ecommerce website https://luma.enablementadobe.com/content/luma/us/en.html
-Generated at: 2025-08-11T22:26:34.331396
+Generated step definitions for test the application
+Generated at: 2025-08-12T05:52:18.082461
 """
 from pytest_bdd import given, when, then, scenarios, parsers
 from playwright.sync_api import Page, expect

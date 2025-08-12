@@ -1,6 +1,6 @@
 """
-Generated step definitions for Checkout any items from https://luma.enablementadobe.com/content/luma/us/en.html
-Generated at: 2025-08-12T02:42:36.726239
+Generated step definitions for test the application
+Generated at: 2025-08-12T05:52:18.083761
 """
 from pytest_bdd import given, when, then, scenarios, parsers
 from playwright.sync_api import Page, expect

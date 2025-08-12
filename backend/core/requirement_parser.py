@@ -47,6 +47,30 @@ class RequirementParser:
             }
         }
     
+    def _extract_json_snippet(self, raw: str) -> str:
+        """Extract a JSON object/array from raw LLM output (strips code fences, prefaces)."""
+        if not raw:
+            return ""
+        text = raw.strip()
+        # Strip code fences if present
+        if text.startswith("```"):
+            # remove first fence line and trailing fence
+            try:
+                first_nl = text.find("\n")
+                text = text[first_nl+1:]
+                if text.endswith("```"):
+                    text = text[: -3]
+            except Exception:
+                pass
+        # Find JSON object or array
+        s_obj, e_obj = text.find("{"), text.rfind("}")
+        s_arr, e_arr = text.find("["), text.rfind("]")
+        if s_obj != -1 and e_obj != -1 and e_obj > s_obj:
+            return text[s_obj: e_obj + 1]
+        if s_arr != -1 and e_arr != -1 and e_arr > s_arr:
+            return text[s_arr: e_arr + 1]
+        return text
+
     def _extract_story_parts(self, story: str) -> Dict[str, Any]:
         """Extract parts from user story using regex"""
         parts = {
@@ -164,19 +188,23 @@ Focus on clarity, completeness, and testability of acceptance criteria."""
         )
         
         # Validate and repair if needed
-        valid, error = self.orchestrator.validate_json_response(response.content, self.schema)
+        snippet = self._extract_json_snippet(response.content or "")
+        valid, error = self.orchestrator.validate_json_response(snippet, self.schema)
         if not valid:
-            logger.warning(f"Initial parse invalid: {error}")
-            repaired = self.orchestrator.repair_json(response.content, error, self.schema)
+            logger.info("Parser: non-JSON/invalid JSON from LLM; attempting repair/fallback")
+            repaired = self.orchestrator.repair_json(snippet, error, self.schema)
             if repaired:
-                response.content = repaired
+                snippet = self._extract_json_snippet(repaired)
             else:
                 # Fallback: create minimal valid structure
-                response.content = self._create_fallback_graph(story_text, extracted)
+                snippet = self._create_fallback_graph(story_text, extracted)
         
         # Parse to Pydantic model
         try:
-            data = json.loads(response.content)
+            raw = (snippet or "").strip()
+            if not raw:
+                raise ValueError("Empty LLM response")
+            data = json.loads(raw)
             # Add metadata
             data["provider_metadata"] = {
                 "provider": response.provider.value,

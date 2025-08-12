@@ -1,26 +1,58 @@
+{% if functional_area %}
+@{{ functional_area }}
+{% endif %}
 Feature: {{ requirement.title }}
-  As a {{ requirement.actor }}
-  I want {{ requirement.goal }}
-  So that {{ requirement.benefit }}
-
-  Background:
-    Given the test environment is configured
-    And execution mode is set to "{{ config.uiMode }}" for UI and "{{ config.apiMode }}" for API
 
 {% for test_case in test_cases %}
-  @{{ test_case.priority }} @{{ test_case.type }}{% for tag in test_case.tags %} @{{ tag }}{% endfor %}
-  Scenario: {{ test_case.title }}
-    {% for precondition in test_case.preconditions %}
-    Given {{ precondition }}
-    {% endfor %}
-    {% for step in test_case.steps %}
-    When I perform "{{ step.action }}" with params:
-      """
-      {{ step.params | tojson(indent=2) }}
-      """
-    {% endfor %}
-    {% for expectation in test_case.expected %}
-    Then {{ expectation }}
-    {% endfor %}
+  {% if test_case.data and test_case.data.get('scenario_type') == 'scenario_outline' %}
+  Scenario Outline: {{ test_case.title.split(':')[-1].strip() if ':' in test_case.title else test_case.title }}
+    {% if test_case.data.raw_steps %}
+      {% for step in test_case.data.raw_steps %}
+    {{ step }}
+      {% endfor %}
+    {% else %}
+    Given I have navigated to the "<category>" page
+    When I perform "<action>" on the page
+    Then I should see the expected "<result>"
+    {% endif %}
 
+  Examples:
+    {% if test_case.data and test_case.data.examples %}
+      {% set example_keys = test_case.data.examples[0].keys() if test_case.data.examples else [] %}
+      {% if example_keys %}
+    | {% for key in example_keys %}{{ key }}{% if not loop.last %} | {% endif %}{% endfor %} |
+        {% for example in test_case.data.examples %}
+    | {% for key in example_keys %}{{ example[key] }}{% if not loop.last %} | {% endif %}{% endfor %} |
+        {% endfor %}
+      {% else %}
+    | parameter |
+    | value1    |
+    | value2    |
+      {% endif %}
+    {% else %}
+    | category    |
+    | Electronics |
+    | Apparel     |
+    | Home        |
+    {% endif %}
+
+  {% else %}
+  Scenario: {{ test_case.title.split(':')[-1].strip() if ':' in test_case.title else test_case.title }}
+    {% if test_case.data and test_case.data.raw_steps %}
+      {% for step in test_case.data.raw_steps %}
+    {{ step }}
+      {% endfor %}
+    {% else %}
+      {% for precondition in test_case.preconditions %}
+    Given {{ precondition }}
+      {% endfor %}
+      {% for step in test_case.steps %}
+    When {{ step.action | replace('.', ' ') }}
+      {% endfor %}
+      {% for expectation in test_case.expected %}
+    Then {{ expectation }}
+      {% endfor %}
+    {% endif %}
+
+  {% endif %}
 {% endfor %}

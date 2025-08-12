@@ -206,6 +206,19 @@ const TestGeneration: React.FC = () => {
   const [autoGenerateCode, setAutoGenerateCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  // Auto-dismiss toasts
+  useEffect(() => {
+    if (success !== null) {
+      const t = setTimeout(() => setSuccess(null), 8000);
+      return () => clearTimeout(t);
+    }
+  }, [success, setSuccess]);
+  useEffect(() => {
+    if (error !== null) {
+      const t = setTimeout(() => setError(null), 8000);
+      return () => clearTimeout(t);
+    }
+  }, [error, setError]);
 
   // Step 1: Parse requirement
   const handleParse = async () => {
@@ -363,10 +376,11 @@ const TestGeneration: React.FC = () => {
         </div>
       )}
       {success && (
-        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-          {success}
-            </div>
-          )}
+        <div className="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded flex justify-between items-start">
+          <span>{success}</span>
+          <button onClick={() => setSuccess(null)} className="ml-4 text-green-900 hover:text-green-700">✕</button>
+        </div>
+      )}
 
       {/* Input Section */}
       <div className="bg-white p-6 rounded-lg shadow mb-6">
@@ -492,8 +506,8 @@ const TestGeneration: React.FC = () => {
            >
              {currentStep === 'generating' ? 'Generating...' : 'Generate Tests'}
            </button>
-         </div>
-       )}
+            </div>
+          )}
 
                     {/* Approve Tests Section */}
        {canProceedToApprove && testSuite && (
@@ -545,13 +559,13 @@ const TestGeneration: React.FC = () => {
                      </th>
                      <th className="p-3 border text-left font-semibold">TC ID</th>
                      <th className="p-3 border text-left font-semibold">Test Scenario</th>
-                     <th className="p-3 border text-left font-semibold">BDD Test</th>
+                      <th className="p-3 border text-left font-semibold">BDD Test</th>
                      <th className="p-3 border text-left font-semibold">Priority</th>
                      <th className="p-3 border text-left font-semibold">Type</th>
-                   </tr>
-                 </thead>
-                 <tbody>
-                   {testSuite.test_cases.map((test) => (
+                </tr>
+              </thead>
+              <tbody>
+                    {testSuite.test_cases.map((test) => (
                      <tr key={test.id} className="hover:bg-gray-50">
                        <td className="p-3 border">
                          <input
@@ -563,49 +577,45 @@ const TestGeneration: React.FC = () => {
                        <td className="p-3 border font-mono text-sm">{test.id}</td>
                        <td className="p-3 border">{test.title}</td>
                        <td className="p-3 border">
-                         <div className="font-mono text-xs bg-gray-100 p-2 rounded max-w-md">
-                           <div className="text-green-600">Feature: {test.title.split(':')[0]}</div>
-                           <div className="text-purple-600 mt-1">As a shopper</div>
-                           <div className="text-purple-600">I want to test e-commerce functionality</div>
-                           <div className="text-purple-600 mb-2">So that the website works correctly</div>
-                           
-                           <div className="text-gray-600 text-xs mb-1">Background:</div>
-                           <div className="text-gray-700 mb-2">{test.preconditions?.[0] || 'Given I am on the e-commerce website'}</div>
-                           
-                           <div className="text-blue-600 font-semibold">Scenario: {test.title.split(':')[1] || test.title}</div>
-                           <div className="text-gray-700 mt-1">
-                             {test.steps?.map((step, idx) => (
-                               <div key={idx} className="mb-1">
-                                 {step.action === 'search.execute' && `When I search for "${step.params?.query || 'products'}"`}
-                                 {step.action === 'cart.add_item' && 'When I click "Add to Cart"'}
-                                 {step.action === 'navigation.goto' && `When I navigate to ${step.params?.target || 'the page'}`}
-                                 {step.action === 'cart.apply_coupon' && `When I apply coupon "${step.params?.code || 'WELCOME10'}"`}
-                                 {step.action === 'product.set_quantity' && `When I set quantity to ${step.params?.quantity || 1}`}
-                                 {step.action === 'form.enter_zip' && `When I enter ZIP code "${step.params?.zip || '10001'}"`}
-                                 {!['search.execute', 'cart.add_item', 'navigation.goto', 'cart.apply_coupon', 'product.set_quantity', 'form.enter_zip'].includes(step.action) && 
-                                   `When I perform ${step.action.replace('.', ' ')}`}
-                               </div>
-                             )) || (
-                               <>
-                                 <div>When I perform the test action</div>
-                                 <div>Then I should see the expected result</div>
-                               </>
-                             )}
-                             
-                             {test.data?.examples && (
-                               <div className="mt-2 text-xs">
-                                 <div className="text-gray-600">Examples:</div>
-                                 <div className="bg-white p-1 rounded border">
-                                   {test.data.examples.slice(0, 2).map((example: any, idx: number) => (
-                                     <div key={idx} className="text-gray-700">
-                                       {Object.entries(example).map(([key, value]) => `${key}: ${value}`).join(', ')}
-                                     </div>
-                                   ))}
-                                 </div>
-                               </div>
-                             )}
-                           </div>
-                         </div>
+                          <div className="font-mono text-xs bg-gray-100 p-2 rounded max-w-md">
+                            <div className="text-green-600">Feature: {test.title.split(':')[0]}</div>
+                            {/* Background */}
+                            {(test.preconditions && test.preconditions.length > 0) && (
+                              <>
+                                <div className="text-gray-600 text-xs mt-2">Background:</div>
+                                <div className="text-gray-700 mb-2">{test.preconditions[0]}</div>
+                              </>
+                            )}
+                            {/* Scenario title */}
+                            <div className="text-blue-600 font-semibold">Scenario: {(test.data as any)?.scenario_name || test.title.split(':')[1] || test.title}</div>
+                            {/* Specific BDD lines from raw_steps */}
+                            <div className="text-gray-700 mt-1">
+                              {Array.isArray((test as any).data?.raw_steps) ? (
+                                (test as any).data.raw_steps.map((line: string, idx: number) => (
+                                  <div key={idx} className="mb-1">{line}</div>
+                                ))
+                              ) : (
+                                <>
+                                  <div>Given the site is available</div>
+                                  <div>When I navigate to the homepage</div>
+                                  <div>Then I see primary navigation, search, and banners</div>
+                                </>
+                              )}
+                              {/* Examples */}
+                              {Array.isArray((test as any).data?.examples) && (
+                                <div className="mt-2 text-xs">
+                                  <div className="text-gray-600">Examples:</div>
+                                  <div className="bg-white p-1 rounded border">
+                                    {(test as any).data.examples.slice(0, 3).map((example: any, idx: number) => (
+                                      <div key={idx} className="text-gray-700">
+                                        {Object.entries(example).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                        </td>
                        <td className="p-3 border">
                          <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800">
@@ -621,11 +631,11 @@ const TestGeneration: React.FC = () => {
                            {test.type}
                          </span>
                        </td>
-                     </tr>
-                   ))}
-                 </tbody>
-               </table>
-             </div>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
            </div>
 
            <button
@@ -644,7 +654,7 @@ const TestGeneration: React.FC = () => {
            <h2 className="text-xl font-semibold mb-4">Step 6: Run Tests</h2>
           
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
+          <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">UI Mode:</label>
               <select
                 value={uiMode}
@@ -700,10 +710,10 @@ const TestGeneration: React.FC = () => {
              <p className="text-green-700 mb-3">
                Your test code has been automatically generated during approval and saved to:
              </p>
-             <div className="bg-white p-3 rounded border">
-               <p className="font-mono text-sm">
-                 <strong>Directory:</strong> tests/{requirement?.session_id}/
-               </p>
+              <div className="bg-white p-3 rounded border">
+                <p className="font-mono text-sm">
+                  <strong>Directory:</strong> tests/
+                </p>
                <p className="font-mono text-sm">
                  <strong>Structure:</strong>
                </p>
@@ -788,7 +798,7 @@ const TestGeneration: React.FC = () => {
              </div>
            )}
            
-           </div>
+            </div>
           )}
         </div>
   );

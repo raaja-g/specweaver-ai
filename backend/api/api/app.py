@@ -276,7 +276,9 @@ async def generate_test_cases(session_id: str, req: GenerateRequest):
                     "title": tc.title,
                     "type": tc.type,
                     "priority": tc.priority,
-                    "trace_to": tc.traceTo
+                    "trace_to": tc.traceTo,
+                    "preconditions": tc.preconditions,
+                    "data": tc.data,  # includes raw_steps/examples if present
                 }
                 for tc in test_suite.test_cases
             ],

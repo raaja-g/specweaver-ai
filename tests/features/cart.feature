@@ -1,41 +1,43 @@
-Feature: ecommerce website https://luma.enablementadobe.com/content/luma/us/en.html
-  As a user
-  I want ecommerce website https://luma.enablementadobe.com/content/luma/us/en.html
-  So that meet their requirements
+@cart
+Feature: test the application
+  As a tester
+  I want test the application
+  So that ensure quality and functionality
 
   Background:
-    Given the test environment is configured
-    And execution mode is set to "real" for UI and "mock" for API
+    Given the site is available
+    And I start a clean browser session
 
-  @P0 @positive @cart_&_mini-cart @positive @scenario  Scenario: Cart & Mini-cart: View mini-cart
-    Given Given I have at least one item in my cart
-    When I perform "user.action" with params:
-      """
-      {
-  "description": "When I open the mini-cart"
-}
-      """
-    When I perform "user.action" with params:
-      """
-      {
-  "description": "Then I see line items and subtotal"
-}
-      """
-    Then Scenario 'View mini-cart' completes successfully
+  @P0 @positive @cart_&_mini-cart @positive @scenario  Scenario: View mini-cart
+    When I open the mini-cart
+    Then I see line items and subtotal
 
-  @P0 @positive @cart_&_mini-cart @positive @scenario  Scenario: Cart & Mini-cart: Apply coupon code
-    Given Given I have at least one item in my cart
-    When I perform "cart.apply_coupon" with params:
-      """
-      {
-  "code": "WELCOME10"
-}
-      """
-    When I perform "user.action" with params:
-      """
-      {
-  "description": "Then totals reflect the coupon"
-}
-      """
-    Then Scenario 'Apply coupon code' completes successfully
+  @P0 @positive @cart_&_mini-cart @positive @scenario  Scenario: Apply coupon code
+    When I apply coupon "WELCOME10"
+    Then totals reflect the coupon
+
+  @P2 @edge @auto @edge  Scenario: Edge quantity maximum
+    Given I am on a product detail page
+    When I set quantity to 999
+    Then I see an error that quantity exceeds allowed maximum
+
+  @P2 @edge @auto @edge  Scenario: Edge quantity maximum
+    Given I am on a product detail page
+    When I set quantity to 999
+    Then I see an error that quantity exceeds allowed maximum
+
+  @P2 @edge @auto @edge  Scenario: Edge quantity maximum
+    Given I am on a product detail page
+    When I set quantity to 999
+    Then I see an error that quantity exceeds allowed maximum
+
+  @P2 @edge @auto @edge  Scenario: Edge quantity maximum
+    Given I am on a product detail page
+    When I set quantity to 999
+    Then I see an error that quantity exceeds allowed maximum
+
+  @P2 @edge @auto @edge  Scenario: Edge quantity maximum
+    Given I am on a product detail page
+    When I set quantity to 999
+    Then I see an error that quantity exceeds allowed maximum
 

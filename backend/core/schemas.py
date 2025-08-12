@@ -51,7 +51,7 @@ class TestCase(BaseModel):
     """Structured test case"""
     id: str = Field(..., description="Test case ID (e.g., TC-CHK-001)")
     title: str = Field(..., description="Test case title")
-    priority: Literal["P0", "P1", "P2"] = Field(..., description="Priority level")
+    priority: Literal["P0", "P1", "P2", "P3"] = Field(..., description="Priority level")
     type: Literal["positive", "negative", "edge"] = Field(..., description="Test type")
     traceTo: List[str] = Field(..., description="AC IDs this test covers")
     preconditions: List[str] = Field(default_factory=list)
