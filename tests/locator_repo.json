@@ -1,13 +1,6 @@
 {
   "version": 1,
   "pages": {
-    "search": {
-      "execute": [
-        {
-          "click": "[data-action='execute']"
-        }
-      ]
-    },
     "user": {
       "action": [
         {
@@ -21,15 +14,8 @@
           "click": "[data-action='goto']"
         }
       ]
-    },
-    "cart": {
-      "add_item": [
-        {
-          "click": "[data-action='add_item']"
-        }
-      ]
     }
   },
-  "created_at": "2025-08-12T13:12:51.433901",
+  "created_at": "2025-08-12T14:17:29.143984",
   "auto_generated": true
 }

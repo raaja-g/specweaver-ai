@@ -1,6 +1,6 @@
 """
-Generated step definitions for test the e-commerce website functionality
-Generated at: 2025-08-12T13:12:51.432131
+Generated step definitions for test the application
+Generated at: 2025-08-12T14:17:29.141824
 """
 from pytest_bdd import given, when, then, scenarios, parsers
 from playwright.sync_api import Page, expect
@@ -10,7 +10,7 @@ import httpx
 from typing import Dict, Any
 
 # Load scenarios from the specific feature file
-FEATURE_FILE = Path(__file__).resolve().parents[2] / "features" / "checkout.feature"
+FEATURE_FILE = Path(__file__).resolve().parents[2] / "features" / ""
 scenarios(str(FEATURE_FILE))
 
 

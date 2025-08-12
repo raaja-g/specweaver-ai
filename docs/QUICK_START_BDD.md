@@ -117,16 +117,39 @@ Verbose output:
 pytest -vv
 ```
 
-HTML report:
+HTML report (enabled by default in pytest.ini):
 
 ```bash
 pytest --html=reports/pytest.html --self-contained-html
+```
+
+Parallel execution and progress:
+
+```bash
+# Run with 4 workers, distribute by scope, show live logs and step names
+HEADLESS=1 UI_MODE=real TARGET_URL="https://your.app" \
+pytest -n 4 --dist=loadscope -vv -s
+
+# Auto-pick workers based on CPU
+pytest -n auto --dist=loadscope -vv -s
+
+# Show top slow tests
+pytest -n 8 --dist=loadscope -vv -s --durations=10
+```
+
+You can set defaults in `pytest.ini` (optional):
+
+```ini
+[pytest]
+addopts = -q --capture=no --html=reports/pytest.html --self-contained-html -n auto --dist=loadscope
 ```
 
 Where to see results:
 
 - Terminal output shows pass/fail; dots indicate success.
 - Optional HTML report at `reports/pytest.html`.
+ - Per-test logs at `reports/logs/<testname>.log`.
+ - Live console logs enabled via `--capture=no`.
 
 ## 5) Environment configuration
 
@@ -148,9 +171,14 @@ Core config files:
 
 Change target URL or modes:
 
-- Edit `execution_config` defaults in `tests/conftest.py`, or
-- Pass `--ui-mode` / `--api-mode` when running `synthesize` or `full`.
+- Create `tests/execution_config.json`, e.g. `{ "uiMode": "real", "apiMode": "stub", "target_url": "https://your.app" }`
+- Or set env vars per run: `TARGET_URL=... UI_MODE=real API_MODE=stub pytest ...`
+- Or pass `--ui-mode` / `--api-mode` when running `synthesize` or `full`.
 
+Headless vs headed browser:
+
+- By default we launch headed for visibility in dev.
+- For parallel runs, prefer headless: set `HEADLESS=1`.
 Optional env vars (only if using LLM providers for parsing/generation):
 
 - Provider API keys per `config/llm.yml` (e.g., `OPENAI_API_KEY`, `GEMINI_API_KEY`) or configure local/Ollama.
