@@ -1,139 +1,163 @@
 @cart
-Feature: test the application
+Feature: test the e-commerce website functionality
 
-  Scenario: [P0] Successfully complete shipping details with a valid address
-    Given I have a 'Radiant Tee' and a 'Strive Shoulder Pack' in my cart
-    And I proceed to checkout as a guest
-    When I fill the shipping address form with valid details for 'Jane Doe' at '123 Main St, Los Angeles, CA 90001'
-    And I enter the email 'jane.doe@example.com' and phone number '555-123-4567'
-    And I select 'Flat Rate' shipping
-    Then I can proceed to the 'Payment Method' step
+  Scenario: Add a simple product to the cart from the category page
+    Given I am viewing the 'Men/Tops' category page
+    And the 'Argus All-Weather Tank' is in stock
+    When I click the 'Add to Cart' button for the 'Argus All-Weather Tank'
+    Then a success message 'You added Argus All-Weather Tank to your shopping cart.' is displayed
+    And the cart quantity indicator updates to '1'
 
-  Scenario: [P2] Attempt to proceed with an invalid email address format
-    Given I am on the guest checkout shipping address page
-    When I fill the shipping address form with the email 'jane.doe-invalid-email'
-    And I click the 'Next' button
-    Then I should see a validation error message 'Please enter a valid email address (Ex: johndoe@domain.com).'
-    And I should remain on the shipping address page
+  Scenario: Add a configurable product to the cart from its details page
+    Given I am on the product details page for 'Hero Hoodie'
+    When I select size 'M' and color 'Green'
+    And I click the 'Add to Cart' button
+    Then the mini-cart shows 'Hero Hoodie' with size 'M' and color 'Green'
+    And I see a confirmation message for adding the item
 
-  Scenario: [P0] Checkout using the default saved shipping address
-    Given I am a registered user and logged in
-    And I have at least two saved addresses, one of which is a default
-    And I have items in my cart and I proceed to checkout
-    Then my default shipping address is pre-selected
-    When I click the 'Next' button
-    Then I proceed to the payment step without entering new address details
+  Scenario: Update item quantity in the shopping cart page
+    Given I have a 'Quest Lumaflex™ Band' with quantity 1 in my cart
+    When I navigate to the shopping cart page
+    And I change the quantity for 'Quest Lumaflex™ Band' to '3'
+    And I click the 'Update Shopping Cart' button
+    Then the subtotal for 'Quest Lumaflex™ Band' should be three times its unit price
+    And the cart grand total is updated accordingly
 
-  Scenario: [P1] Select a non-default saved shipping address
-    Given I am a logged-in user with multiple saved addresses on the checkout shipping page
-    When I select a different, non-default saved address from my address book
-    And I click the 'Next' button
-    Then the order summary should reflect the newly selected address
-    And I proceed to the payment step
+  Scenario: Remove an item from the cart
+    Given I have 'Push It Messenger Bag' and 'Hero Hoodie' in my cart
+    When I view the shopping cart page
+    And I click the 'Remove' icon for the 'Push It Messenger Bag'
+    Then the 'Push It Messenger Bag' is no longer listed in the cart
+    And the cart grand total is updated to reflect only the 'Hero Hoodie'
 
-  Scenario: [P1] Add a new shipping address during checkout
-    Given I am a logged-in user on the checkout shipping page
-    When I click the 'New Address' button
-    And I fill in the new address form for '100 New Way, San Francisco, CA 94105'
-    And I choose to save this address to my address book
-    And I proceed to the next step
-    Then the new address is used for shipping
-    And it appears in my list of saved addresses for future orders
+  Scenario: Attempt to add a product without selecting required options
+    Given I am on the product details page for 'Radiant Tee' which requires size and color
+    When I click the 'Add to Cart' button without selecting a size or color
+    Then I see a validation message 'This is a required field.' next to the size and color options
+    And the item is not added to the cart
 
-  Scenario: [P2] Edit an existing address during checkout
-    Given I am a logged-in user on the checkout shipping page
-    When I choose to edit my default shipping address
-    And I update the street address to '125 Updated Ave' and the ZIP code to '90028'
-    And I save the changes
-    Then the updated address is selected for the current order
-    And the address is permanently updated in my address book
+  Scenario: Attempt to register with an existing email address
+    Given an account already exists for 'existing.user@example.com'
+    When I try to create a new account using the email 'existing.user@example.com'
+    Then I see an error message 'There is already an account with this email address.'
+    And I remain on the registration page
 
-  Scenario: [P2] Shipping methods available are dependent on the shipping address
-    Given I have provided a shipping address outside the United States
-    When I proceed to the shipping method step
-    Then I should not see domestic-only shipping options like 'USPS Priority Mail'
-    And I should see international shipping options
+  Scenario: Login with an invalid email address format [1]
+    Given I am on the customer login page
+    When I enter 'plainaddress' in the email field and any password
+    And I click the 'Sign In' button
+    Then I see a client-side validation message 'Please enter a valid email address (Ex: johndoe@domain.com).'
 
-  Scenario: [P0] Use the same address for shipping and billing
-    Given I am on the payment page after entering my shipping address
-    When the 'My billing and shipping address are the same' checkbox is checked
-    And I place the order successfully
-    Then the order confirmation details show identical shipping and billing addresses
+  Scenario: Login with an invalid email address format [2]
+    Given I am on the customer login page
+    When I enter '@missingusername.com' in the email field and any password
+    And I click the 'Sign In' button
+    Then I see a client-side validation message 'Please enter a valid email address (Ex: johndoe@domain.com).'
 
-  Scenario: [P1] Specify a different billing address
-    Given I am on the payment page
-    When I uncheck the 'My billing and shipping address are the same' checkbox
-    Then a new address form for the billing address appears
-    When I fill the billing address form with '777 Corporate Dr, New York, NY 10004'
-    And I place the order
-    Then the order confirmation shows the correct, different shipping and billing addresses
+  Scenario: Login with an invalid email address format [3]
+    Given I am on the customer login page
+    When I enter 'username@.com' in the email field and any password
+    And I click the 'Sign In' button
+    Then I see a client-side validation message 'Please enter a valid email address (Ex: johndoe@domain.com).'
 
-  Scenario: [P2] Attempt to proceed with an incomplete separate billing address
-    Given I have unchecked 'My billing and shipping address are the same'
-    When I fill the billing address form but omit the 'Street' field
-    And I attempt to place the order
-    Then I see a validation error 'This is a required field.' for the Street field
-    And the order is not placed
+  Scenario: Apply a valid promotional code in the cart
+    Given I have items in my shopping cart totaling over $50.00
+    And a valid 10% discount code 'LUMA10' exists
+    When I expand the 'Apply Discount Code' section in the cart
+    And I enter 'LUMA10' and click 'Apply Discount'
+    Then a success message is shown
+    And the cart summary displays a 'Discount' row with the correct calculated amount
+    And the order total is reduced
 
-  Scenario: [P1] A logged-in user selects a different saved address for billing
-    Given I am a logged-in user with multiple saved addresses
-    And I am on the payment page
-    When I uncheck the 'My billing and shipping address are the same' checkbox
-    And I select a different saved address from the dropdown for my billing address
-    And I place the order
-    Then the order is placed successfully using the selected billing address
+  Scenario: Remove an applied promotional code
+    Given I have successfully applied the discount code 'LUMA10' to my cart
+    When I click the 'Cancel' link next to the applied discount code
+    Then the 'Discount' row is removed from the cart summary
+    And the order total reverts to the original amount
 
-  Scenario: [P2] Remove an applied promotional code
-    Given I have successfully applied the discount code '20OFF'
-    And the order total reflects the discount
-    When I click the 'Cancel' or 'Remove' button for the applied coupon
-    Then a success message 'Your coupon was successfully removed.' is displayed
-    And the 'Discount' line item is removed from the Order Summary
-    And the Order Total reverts to its original amount
+  Scenario: Add a new address to the address book
+    Given I am logged in and on the 'Address Book' page
+    When I click 'Add New Address'
+    And I fill in the form with valid details for a new address, e.g., 'Work Office'
+    And I click 'Save Address'
+    Then I am redirected back to the 'Address Book' page
+    And the newly added 'Work Office' address is listed
 
-  Scenario: [P3] Attempt to apply a discount code that does not meet cart criteria
-    Given I have a cart total of $40
-    And a valid discount code 'FREESHIP50' exists for orders over $50
-    When I enter the code 'FREESHIP50' and apply it
-    Then I see an error message indicating the minimum purchase amount has not been met
-    And the discount is not applied
+  Scenario: Edit an existing address
+    Given I have a saved 'Home' address in my address book
+    When I click 'Edit Address' for my 'Home' address
+    And I update the street address from '123 Main St' to '456 Oak Ave'
+    And I click 'Save Address'
+    Then the address book shows the updated street '456 Oak Ave' for my 'Home' address
 
-  Scenario: [P0] Order is placed and cart becomes empty
-    Given I have successfully placed an order
-    When I navigate back to the shopping cart page
-    Then I see the message 'You have no items in your shopping cart.'
-    And the cart icon in the header shows '0' items
+  Scenario: Change the default billing address
+    Given I have two addresses, 'Home' and 'Work', and 'Home' is the default billing address
+    When I navigate to the 'Address Book' page
+    And I click 'Change Billing Address' and select the 'Work' address
+    And I save the change
+    Then the 'Work' address is now marked as the 'Default Billing Address'
 
-  Scenario: [P1] An order confirmation email is sent to the customer's email address
-    Given a customer with email 'confirmation-test@example.com' has successfully placed order '000012345'
-    When the order processing is complete
-    Then an email with the subject 'Your Luma order confirmation' should be sent to 'confirmation-test@example.com'
-    And the email body should contain the order number '000012345'
+  Scenario: Delete an address from the address book
+    Given I have an old address 'Previous Apartment' that I no longer use
+    When I am on the 'Address Book' page
+    And I click 'Delete Address' for the 'Previous Apartment'
+    And I confirm the deletion in the popup dialog
+    Then the 'Previous Apartment' address is no longer listed in my address book
 
-  Scenario: [P1] Confirmation email contains correct item details
-    Given order '000012345' contained '1 x Radiant Tee' and '2 x Quest Lumaflex™ Band'
-    When the confirmation email for this order is inspected
-    Then the email body should list 'Radiant Tee' with quantity 1
-    And it should list 'Quest Lumaflex™ Band' with quantity 2
+  Scenario: Add an item to the wishlist
+    Given I am a logged-in user viewing the 'Strive Endurance Fleece' product page
+    When I click the 'Add to Wish List' button
+    Then I see a success message 'Strive Endurance Fleece has been added to your Wish List.'
+    And I am redirected to my 'My Wish List' page
 
-  Scenario: [P1] User is prevented from checking out when an item goes out of stock
-    Given I have '1 x Summit Watch' (SKU: 24-MB04) in my cart, and its stock level is 1
-    And another customer simultaneously purchases the last 'Summit Watch'
-    When I proceed to the final review step of checkout
-    Then I see a message 'The requested qty is not available'
-    And the 'Place Order' button is disabled
+  Scenario: View items in the wishlist
+    Given I have previously added 'Hero Hoodie' and 'Push It Messenger Bag' to my wishlist
+    When I navigate to my 'My Wish List' page
+    Then I see both 'Hero Hoodie' and 'Push It Messenger Bag' listed
+    And I can see their price and an 'Add to Cart' button for each
 
-  Scenario: [P1] Cart quantity is automatically updated if requested quantity exceeds stock
-    Given I have '10 x Luma Analog Watch' in my cart
-    And the current stock for 'Luma Analog Watch' is only 5
-    When I proceed to the checkout page
-    Then my cart is automatically updated to '5 x Luma Analog Watch'
-    And a message is displayed: 'We updated your cart item quantity to match the available stock.'
+  Scenario: Remove an item from the wishlist
+    Given my wishlist contains 'Strive Endurance Fleece'
+    When I am on my 'My Wish List' page
+    And I click the 'Remove item' (X) icon for 'Strive Endurance Fleece'
+    And I confirm the action
+    Then 'Strive Endurance Fleece has been removed from your Wish List.' message is displayed
+    And the item is no longer on the page
 
-  Scenario: [P2] User is redirected to cart with error message if item is OOS on page load
-    Given I have an item in my cart that was in stock yesterday
-    And the item is now out of stock
-    When I visit the checkout URL directly from a bookmark
-    Then I am redirected to the shopping cart page
-    And a message is displayed: 'One or more items in your cart are no longer available.'
+  Scenario: Add an item from the wishlist to the cart
+    Given my wishlist contains 'Quest Lumaflex™ Band'
+    When I am on my 'My Wish List' page
+    And I click 'Add to Cart' for 'Quest Lumaflex™ Band'
+    Then the item is added to my shopping cart
+    And the cart quantity indicator updates
+
+  Scenario: Guest user cannot add item to wishlist
+    Given I am a guest user viewing a product page
+    When I click the 'Add to Wish List' button
+    Then I am redirected to the login page
+
+  Scenario: Product page displays 'In Stock' for available items
+    Given the 'Hero Hoodie' has a stock level greater than 0
+    When a shopper views the 'Hero Hoodie' product page
+    Then the availability status is displayed as 'In Stock'
+    And the 'Add to Cart' button is enabled
+
+  Scenario: Product page displays 'Out of Stock' for unavailable items
+    Given the 'Phoebe Zipper Sweatshirt' has a stock level of 0
+    When a shopper views the 'Phoebe Zipper Sweatshirt' product page
+    Then the availability status is displayed as 'Out of Stock'
+    And the 'Add to Cart' button is disabled or hidden
+
+  Scenario: API check prevents adding out-of-stock item to cart
+    Given the 'Phoebe Zipper Sweatshirt' (SKU `WS09`) is out of stock
+    When a user attempts to add SKU `WS09` to the cart via a direct API call
+    Then the API should return an error response with status code 4xx
+    And the response body should contain a message like 'The requested qty is not available'
+    And the user's cart remains unchanged
+
+  Scenario: Attempt to subscribe with an invalid email address
+    Given I am on any page with the newsletter subscription form
+    When I enter 'invalid-email' into the form
+    And I click 'Subscribe'
+    Then I see a client-side validation error 'Please enter a valid email address.'
 
