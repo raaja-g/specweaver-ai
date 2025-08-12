@@ -1,6 +1,6 @@
 """
 Generated step definitions for Auto Synthesized (auth)
-Generated at: 2025-08-12T19:01:59.023088
+Generated at: 2025-08-12T19:10:50.222629
 """
 from pathlib import Path
 from typing import Dict, Any
@@ -19,8 +19,13 @@ scenarios(str(FEATURE_FILE))
 @given('the test environment is configured')
 def setup_environment(page: Page, execution_config):
     # Navigate to base URL so browser visibly opens and context is ready
+    try:
+        page.set_default_timeout(5000)
+        page.set_default_navigation_timeout(10000)
+    except Exception:
+        pass
     base_url = execution_config.get('target_url', '/')
-    page.goto(base_url)
+    page.goto(base_url, wait_until="domcontentloaded")
 
 
 @given('execution mode is set to "<ui_mode>" for UI and "<api_mode>" for API')
@@ -48,29 +53,29 @@ def when_1(page: Page):
     if m:
         name = m.group(1)
         try:
-            page.get_by_role('button', name=name).click()
+            page.get_by_role('button', name=name, exact=False).first.click(timeout=2000)
         except Exception:
-            page.get_by_text(name, exact=False).first.click()
+            page.get_by_text(name, exact=False).first.click(timeout=2000)
         return
     m = re.search(r"enter '([^']*)' .*email", "I click the 'Sign In' button", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Email', exact=False).fill(m.group(1))
+            page.get_by_label('Email', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='email']", m.group(1))
+            page.locator("input[type='email']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"password '([^']+)'", "I click the 'Sign In' button", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Password', exact=False).fill(m.group(1))
+            page.get_by_label('Password', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='password']", m.group(1))
+            page.locator("input[type='password']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"enter \"([^\"]+)\" .*search bar.*press Enter", "I click the 'Sign In' button", re.IGNORECASE)
     if m:
         term = m.group(1)
         try:
-            page.get_by_placeholder('Search', exact=False).fill(term)
+            page.get_by_placeholder('Search', exact=False).first.fill(term, timeout=2000)
         except Exception:
-            page.fill('input[type="search"]', term)
+            page.locator('input[type="search"]').first.fill(term, timeout=2000)
         page.keyboard.press('Enter')
     # Extend with more heuristics as needed
     pass
@@ -81,29 +86,29 @@ def when_2(page: Page):
     if m:
         name = m.group(1)
         try:
-            page.get_by_role('button', name=name).click()
+            page.get_by_role('button', name=name, exact=False).first.click(timeout=2000)
         except Exception:
-            page.get_by_text(name, exact=False).first.click()
+            page.get_by_text(name, exact=False).first.click(timeout=2000)
         return
     m = re.search(r"enter '([^']*)' .*email", "I enter '' in the email field and 'ValidPass123!' in the password field", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Email', exact=False).fill(m.group(1))
+            page.get_by_label('Email', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='email']", m.group(1))
+            page.locator("input[type='email']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"password '([^']+)'", "I enter '' in the email field and 'ValidPass123!' in the password field", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Password', exact=False).fill(m.group(1))
+            page.get_by_label('Password', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='password']", m.group(1))
+            page.locator("input[type='password']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"enter \"([^\"]+)\" .*search bar.*press Enter", "I enter '' in the email field and 'ValidPass123!' in the password field", re.IGNORECASE)
     if m:
         term = m.group(1)
         try:
-            page.get_by_placeholder('Search', exact=False).fill(term)
+            page.get_by_placeholder('Search', exact=False).first.fill(term, timeout=2000)
         except Exception:
-            page.fill('input[type="search"]', term)
+            page.locator('input[type="search"]').first.fill(term, timeout=2000)
         page.keyboard.press('Enter')
     # Extend with more heuristics as needed
     pass
@@ -114,29 +119,29 @@ def when_3(page: Page):
     if m:
         name = m.group(1)
         try:
-            page.get_by_role('button', name=name).click()
+            page.get_by_role('button', name=name, exact=False).first.click(timeout=2000)
         except Exception:
-            page.get_by_text(name, exact=False).first.click()
+            page.get_by_text(name, exact=False).first.click(timeout=2000)
         return
     m = re.search(r"enter '([^']*)' .*email", "I enter 'invalid-email' in the email field and 'ValidPass123!' in the password field", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Email', exact=False).fill(m.group(1))
+            page.get_by_label('Email', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='email']", m.group(1))
+            page.locator("input[type='email']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"password '([^']+)'", "I enter 'invalid-email' in the email field and 'ValidPass123!' in the password field", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Password', exact=False).fill(m.group(1))
+            page.get_by_label('Password', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='password']", m.group(1))
+            page.locator("input[type='password']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"enter \"([^\"]+)\" .*search bar.*press Enter", "I enter 'invalid-email' in the email field and 'ValidPass123!' in the password field", re.IGNORECASE)
     if m:
         term = m.group(1)
         try:
-            page.get_by_placeholder('Search', exact=False).fill(term)
+            page.get_by_placeholder('Search', exact=False).first.fill(term, timeout=2000)
         except Exception:
-            page.fill('input[type="search"]', term)
+            page.locator('input[type="search"]').first.fill(term, timeout=2000)
         page.keyboard.press('Enter')
     # Extend with more heuristics as needed
     pass
@@ -147,29 +152,29 @@ def when_4(page: Page):
     if m:
         name = m.group(1)
         try:
-            page.get_by_role('button', name=name).click()
+            page.get_by_role('button', name=name, exact=False).first.click(timeout=2000)
         except Exception:
-            page.get_by_text(name, exact=False).first.click()
+            page.get_by_text(name, exact=False).first.click(timeout=2000)
         return
     m = re.search(r"enter '([^']*)' .*email", "I enter 'shopper@example.com' in the email field and '' in the password field", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Email', exact=False).fill(m.group(1))
+            page.get_by_label('Email', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='email']", m.group(1))
+            page.locator("input[type='email']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"password '([^']+)'", "I enter 'shopper@example.com' in the email field and '' in the password field", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Password', exact=False).fill(m.group(1))
+            page.get_by_label('Password', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='password']", m.group(1))
+            page.locator("input[type='password']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"enter \"([^\"]+)\" .*search bar.*press Enter", "I enter 'shopper@example.com' in the email field and '' in the password field", re.IGNORECASE)
     if m:
         term = m.group(1)
         try:
-            page.get_by_placeholder('Search', exact=False).fill(term)
+            page.get_by_placeholder('Search', exact=False).first.fill(term, timeout=2000)
         except Exception:
-            page.fill('input[type="search"]', term)
+            page.locator('input[type="search"]').first.fill(term, timeout=2000)
         page.keyboard.press('Enter')
     # Extend with more heuristics as needed
     pass
@@ -180,29 +185,29 @@ def when_5(page: Page):
     if m:
         name = m.group(1)
         try:
-            page.get_by_role('button', name=name).click()
+            page.get_by_role('button', name=name, exact=False).first.click(timeout=2000)
         except Exception:
-            page.get_by_text(name, exact=False).first.click()
+            page.get_by_text(name, exact=False).first.click(timeout=2000)
         return
     m = re.search(r"enter '([^']*)' .*email", "I enter a non-registered email 'nobody@example.com' and any password", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Email', exact=False).fill(m.group(1))
+            page.get_by_label('Email', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='email']", m.group(1))
+            page.locator("input[type='email']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"password '([^']+)'", "I enter a non-registered email 'nobody@example.com' and any password", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Password', exact=False).fill(m.group(1))
+            page.get_by_label('Password', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='password']", m.group(1))
+            page.locator("input[type='password']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"enter \"([^\"]+)\" .*search bar.*press Enter", "I enter a non-registered email 'nobody@example.com' and any password", re.IGNORECASE)
     if m:
         term = m.group(1)
         try:
-            page.get_by_placeholder('Search', exact=False).fill(term)
+            page.get_by_placeholder('Search', exact=False).first.fill(term, timeout=2000)
         except Exception:
-            page.fill('input[type="search"]', term)
+            page.locator('input[type="search"]').first.fill(term, timeout=2000)
         page.keyboard.press('Enter')
     # Extend with more heuristics as needed
     pass
@@ -213,29 +218,29 @@ def when_6(page: Page):
     if m:
         name = m.group(1)
         try:
-            page.get_by_role('button', name=name).click()
+            page.get_by_role('button', name=name, exact=False).first.click(timeout=2000)
         except Exception:
-            page.get_by_text(name, exact=False).first.click()
+            page.get_by_text(name, exact=False).first.click(timeout=2000)
         return
     m = re.search(r"enter '([^']*)' .*email", "I enter my registered email 'shopper@example.com' and an incorrect password 'WrongPassword'", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Email', exact=False).fill(m.group(1))
+            page.get_by_label('Email', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='email']", m.group(1))
+            page.locator("input[type='email']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"password '([^']+)'", "I enter my registered email 'shopper@example.com' and an incorrect password 'WrongPassword'", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Password', exact=False).fill(m.group(1))
+            page.get_by_label('Password', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='password']", m.group(1))
+            page.locator("input[type='password']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"enter \"([^\"]+)\" .*search bar.*press Enter", "I enter my registered email 'shopper@example.com' and an incorrect password 'WrongPassword'", re.IGNORECASE)
     if m:
         term = m.group(1)
         try:
-            page.get_by_placeholder('Search', exact=False).fill(term)
+            page.get_by_placeholder('Search', exact=False).first.fill(term, timeout=2000)
         except Exception:
-            page.fill('input[type="search"]', term)
+            page.locator('input[type="search"]').first.fill(term, timeout=2000)
         page.keyboard.press('Enter')
     # Extend with more heuristics as needed
     pass
@@ -246,29 +251,29 @@ def when_7(page: Page):
     if m:
         name = m.group(1)
         try:
-            page.get_by_role('button', name=name).click()
+            page.get_by_role('button', name=name, exact=False).first.click(timeout=2000)
         except Exception:
-            page.get_by_text(name, exact=False).first.click()
+            page.get_by_text(name, exact=False).first.click(timeout=2000)
         return
     m = re.search(r"enter '([^']*)' .*email", "I enter my registered email 'shopper@example.com' and password 'ValidPass123!'", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Email', exact=False).fill(m.group(1))
+            page.get_by_label('Email', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='email']", m.group(1))
+            page.locator("input[type='email']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"password '([^']+)'", "I enter my registered email 'shopper@example.com' and password 'ValidPass123!'", re.IGNORECASE)
     if m:
         try:
-            page.get_by_label('Password', exact=False).fill(m.group(1))
+            page.get_by_label('Password', exact=False).first.fill(m.group(1), timeout=2000)
         except Exception:
-            page.fill("input[type='password']", m.group(1))
+            page.locator("input[type='password']").first.fill(m.group(1), timeout=2000)
     m = re.search(r"enter \"([^\"]+)\" .*search bar.*press Enter", "I enter my registered email 'shopper@example.com' and password 'ValidPass123!'", re.IGNORECASE)
     if m:
         term = m.group(1)
         try:
-            page.get_by_placeholder('Search', exact=False).fill(term)
+            page.get_by_placeholder('Search', exact=False).first.fill(term, timeout=2000)
         except Exception:
-            page.fill('input[type="search"]', term)
+            page.locator('input[type="search"]').first.fill(term, timeout=2000)
         page.keyboard.press('Enter')
     # Extend with more heuristics as needed
     pass
@@ -279,7 +284,7 @@ def then_1(page: Page):
     # Generic visibility checks for expected text phrases
     m = re.search(r"'([^']+)'", "I should be redirected to the account dashboard")
     if m:
-        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible()
+        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible(timeout=3000)
         return
     # Otherwise leave as TODO
     pass
@@ -288,7 +293,7 @@ def then_2(page: Page):
     # Generic visibility checks for expected text phrases
     m = re.search(r"'([^']+)'", "I should not be logged in")
     if m:
-        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible()
+        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible(timeout=3000)
         return
     # Otherwise leave as TODO
     pass
@@ -297,7 +302,7 @@ def then_3(page: Page):
     # Generic visibility checks for expected text phrases
     m = re.search(r"'([^']+)'", "I should remain on the login page")
     if m:
-        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible()
+        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible(timeout=3000)
         return
     # Otherwise leave as TODO
     pass
@@ -306,7 +311,7 @@ def then_4(page: Page):
     # Generic visibility checks for expected text phrases
     m = re.search(r"'([^']+)'", "I should see a welcome message 'Welcome, Jane!'")
     if m:
-        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible()
+        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible(timeout=3000)
         return
     # Otherwise leave as TODO
     pass
@@ -315,7 +320,7 @@ def then_5(page: Page):
     # Generic visibility checks for expected text phrases
     m = re.search(r"'([^']+)'", "I should see an error message 'Invalid email or password. Please try again.'")
     if m:
-        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible()
+        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible(timeout=3000)
         return
     # Otherwise leave as TODO
     pass
@@ -324,7 +329,7 @@ def then_6(page: Page):
     # Generic visibility checks for expected text phrases
     m = re.search(r"'([^']+)'", "I should see the validation message 'Email address is required.'")
     if m:
-        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible()
+        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible(timeout=3000)
         return
     # Otherwise leave as TODO
     pass
@@ -333,7 +338,7 @@ def then_7(page: Page):
     # Generic visibility checks for expected text phrases
     m = re.search(r"'([^']+)'", "I should see the validation message 'Password is required.'")
     if m:
-        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible()
+        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible(timeout=3000)
         return
     # Otherwise leave as TODO
     pass
@@ -342,7 +347,7 @@ def then_8(page: Page):
     # Generic visibility checks for expected text phrases
     m = re.search(r"'([^']+)'", "I should see the validation message 'Please enter a valid email address.'")
     if m:
-        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible()
+        expect(page.get_by_text(m.group(1), exact=False)).to_be_visible(timeout=3000)
         return
     # Otherwise leave as TODO
     pass
