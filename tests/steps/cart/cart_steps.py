@@ -4,12 +4,14 @@ Generated at: 2025-08-12T13:12:51.431482
 """
 from pytest_bdd import given, when, then, scenarios, parsers
 from playwright.sync_api import Page, expect
+from pathlib import Path
 import json
 import httpx
 from typing import Dict, Any
 
-# Load scenarios from feature file
-scenarios('../features/')
+# Load scenarios from the specific feature file
+FEATURE_FILE = Path(__file__).resolve().parents[2] / "features" / "cart.feature"
+scenarios(str(FEATURE_FILE))
 
 
 @given('the test environment is configured')

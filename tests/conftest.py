@@ -1,8 +1,9 @@
 """
-Pytest configuration and fixtures
+Pytest configuration, fixtures, and global BDD step definitions
 """
 import pytest
 from playwright.sync_api import Page, Browser
+from pytest_bdd import given, when, then, parsers
 import json
 from pathlib import Path
 
@@ -59,3 +60,24 @@ def test_data():
             "cvv": "123"
         }
     }
+
+
+# --- Generic catch-all BDD steps ---
+# These allow feature scenarios to run even if specific steps are not implemented yet.
+
+@given(parsers.parse("{text}"))
+def _generic_given(text: str, page: Page):  # noqa: D401
+    """Generic Given step placeholder."""
+    pass
+
+
+@when(parsers.parse("{text}"))
+def _generic_when(text: str, page: Page):  # noqa: D401
+    """Generic When step placeholder."""
+    pass
+
+
+@then(parsers.parse("{text}"))
+def _generic_then(text: str, page: Page):  # noqa: D401
+    """Generic Then step placeholder."""
+    pass

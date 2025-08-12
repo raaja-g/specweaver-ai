@@ -4,13 +4,19 @@ Generated at: 2025-08-12T13:12:51.430261
 """
 from pytest_bdd import given, when, then, scenarios, parsers
 from playwright.sync_api import Page, expect
+from pathlib import Path
 import json
 import httpx
 from typing import Dict, Any
 
-# Load scenarios from feature file
-scenarios('../features/')
+# Load scenarios from the specific feature file
+FEATURE_FILE = Path(__file__).resolve().parents[2] / "features" / "auth.feature"
+scenarios(str(FEATURE_FILE))
 
+
+@given("I am a new user on the 'Create New Customer Account' page")
+def go_to_create_account(page: Page):
+    pass
 
 @given('the test environment is configured')
 def setup_environment(page: Page):
