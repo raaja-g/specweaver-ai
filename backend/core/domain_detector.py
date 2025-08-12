@@ -76,12 +76,14 @@ class DomainDetector:
             return 'banking'  
         elif any(word in url_lower for word in ['health', 'medical', 'hospital']):
             return 'healthcare'
-        elif any(word in url_lower for word in ['google.com', 'search', 'gmail', 'youtube']):
-            return 'generic'
+        elif any(word in url_lower for word in ['google.com', 'bing.com', 'duckduckgo.com', 'yahoo.com/search']):
+            return 'search_engine'
         
         # Check text content
         if any(word in text_lower for word in ecommerce_keywords):
             return 'ecommerce'
+        elif any(word in text_lower for word in ['search engine', 'serp', 'autocomplete', 'google', 'bing']):
+            return 'search_engine'
         elif any(word in text_lower for word in banking_keywords):
             return 'banking'
         elif any(word in text_lower for word in healthcare_keywords):

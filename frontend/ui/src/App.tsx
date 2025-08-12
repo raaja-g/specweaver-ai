@@ -204,8 +204,11 @@ const TestGeneration: React.FC = () => {
   const [apiMode, setApiMode] = useState('mock');
   const [autoPR, setAutoPR] = useState(false);
   const [autoGenerateCode, setAutoGenerateCode] = useState(false);
+  const [codeGenerated, setCodeGenerated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const STORAGE_KEY = 'sw_test_gen_state_v1';
   // Auto-dismiss toasts
   useEffect(() => {
     if (success !== null) {
@@ -220,6 +223,48 @@ const TestGeneration: React.FC = () => {
     }
   }, [error, setError]);
 
+  // Persist and hydrate wizard state so stages are sticky across navigation
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        setActiveTab(s.activeTab ?? 'text');
+        setStoryText(s.storyText ?? '');
+        setAllowDuplicates(!!s.allowDuplicates);
+        setCurrentStep(s.currentStep ?? 'input');
+        setRequirement(s.requirement ?? null);
+        setTestSuite(s.testSuite ?? null);
+        setSelectedTests(s.selectedTests ?? []);
+        setRunStatus(s.runStatus ?? null);
+        setUiMode(s.uiMode ?? 'real');
+        setApiMode(s.apiMode ?? 'mock');
+        setAutoPR(!!s.autoPR);
+        setAutoGenerateCode(!!s.autoGenerateCode);
+        setCodeGenerated(!!s.codeGenerated);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const s = {
+      activeTab,
+      storyText,
+      allowDuplicates,
+      currentStep,
+      requirement,
+      testSuite,
+      selectedTests,
+      runStatus,
+      uiMode,
+      apiMode,
+      autoPR,
+      autoGenerateCode,
+      codeGenerated,
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
+  }, [activeTab, storyText, allowDuplicates, currentStep, requirement, testSuite, selectedTests, runStatus, uiMode, apiMode, autoPR, autoGenerateCode, codeGenerated]);
+
   // Step 1: Parse requirement
   const handleParse = async () => {
     if (!storyText.trim() && !file) {
@@ -230,19 +275,23 @@ const TestGeneration: React.FC = () => {
     setCurrentStep('parsing');
     setError(null);
     setSuccess(null);
+    // Reset prior session artifacts
+    setRequirement(null);
+    setTestSuite(null);
+    setSelectedTests([]);
+    setRunStatus(null);
+    setCodeGenerated(false);
 
     try {
       let response;
       if (activeTab === 'text') {
         response = await axios.post('http://localhost:8080/api/requirements', {
           story_text: storyText,
-          domain: 'ecommerce',
           tags: ['poc']
         });
       } else if (file) {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('domain', 'ecommerce');
         formData.append('tags', 'poc');
         response = await axios.post('http://localhost:8080/api/requirements/file', formData);
       }
@@ -299,6 +348,7 @@ const TestGeneration: React.FC = () => {
 
       setCurrentStep('synthesizing');
       setSuccess('Tests approved! Code generated.');
+      setCodeGenerated(true);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to approve tests');
       setCurrentStep('approving');
@@ -341,32 +391,68 @@ const TestGeneration: React.FC = () => {
   const canProceedToApprove = testSuite && currentStep === 'approving';
   const canProceedToRun = requirement && currentStep === 'synthesizing';
 
+  // Reset all wizard state
+  const handleReset = () => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    setActiveTab('text');
+    setStoryText('');
+    setFile(null);
+    setAllowDuplicates(false);
+    setCurrentStep('input');
+    setRequirement(null);
+    setTestSuite(null);
+    setSelectedTests([]);
+    setRunStatus(null);
+    setUiMode('real');
+    setApiMode('mock');
+    setAutoPR(false);
+    setAutoGenerateCode(false);
+    setCodeGenerated(false);
+    setError(null);
+    setSuccess(null);
+  };
+
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-6">Test Generation</h1>
 
              {/* Progress Steps */}
        <div className="mb-8">
-         <div className="flex items-center justify-between">
-           {['Input', 'Parse', 'View Parsed', 'Generate Tests', 'Approve', 'Generate Code', 'Run'].map((step, index) => (
-             <div key={step} className="flex items-center">
-               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
-                 index === 0 ? 'bg-blue-600 text-white' :
-                 index === 1 && currentStep === 'parsing' ? 'bg-blue-600 text-white' :
-                 index === 2 && currentStep === 'parsed' ? 'bg-blue-600 text-white' :
-                 index === 3 && currentStep === 'generating' ? 'bg-blue-600 text-white' :
-                 index === 4 && currentStep === 'approving' ? 'bg-blue-600 text-white' :
-                 index === 5 && currentStep === 'synthesizing' ? 'bg-blue-600 text-white' :
-                 index === 6 && currentStep === 'running' ? 'bg-blue-600 text-white' :
-                 'bg-gray-200 text-gray-600'
-               }`}>
-                 {index + 1}
-               </div>
-               <span className="ml-2 text-sm font-medium">{step}</span>
-               {index < 6 && <div className="w-16 h-0.5 bg-gray-200 ml-2" />}
-             </div>
-           ))}
-         </div>
+          <div className="flex items-center justify-between">
+            {['Input', 'Parse', 'View Parsed', 'Generate Tests', 'Approve', 'Generate Code', 'Run'].map((step, index) => {
+              const stepOrder: Record<string, number> = {
+                'Input': 0,
+                'Parse': 1,
+                'View Parsed': 2,
+                'Generate Tests': 3,
+                'Approve': 4,
+                'Generate Code': 5,
+                'Run': 6,
+              };
+              const currentOrder: Record<typeof currentStep, number> = {
+                input: 0,
+                parsing: 1,
+                parsed: 2,
+                generating: 3,
+                approving: 4,
+                synthesizing: 5,
+                running: 6,
+              };
+              const isActive = currentOrder[currentStep] === index;
+              const isCompleted = currentOrder[currentStep] > index || (index === 5 && codeGenerated);
+              return (
+                <div key={step} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                    isActive ? 'bg-blue-600 text-white' : isCompleted ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {index + 1}
+                  </div>
+                  <span className={`ml-2 text-sm font-medium ${isCompleted ? 'text-green-700' : ''}`}>{step}</span>
+                  {index < 6 && <div className={`w-16 h-0.5 ml-2 ${isCompleted ? 'bg-green-400' : 'bg-gray-200'}`} />}
+                </div>
+              );
+            })}
+          </div>
           </div>
 
       {/* Error/Success Messages */}
@@ -458,6 +544,12 @@ const TestGeneration: React.FC = () => {
           className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           {currentStep === 'parsing' ? 'Parsing...' : 'Parse Requirement'}
+        </button>
+        <button
+          onClick={handleReset}
+          className="mt-4 ml-3 px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+        >
+          Reset
         </button>
       </div>
 
@@ -579,13 +671,7 @@ const TestGeneration: React.FC = () => {
                        <td className="p-3 border">
                           <div className="font-mono text-xs bg-gray-100 p-2 rounded max-w-md">
                             <div className="text-green-600">Feature: {test.title.split(':')[0]}</div>
-                            {/* Background */}
-                            {(test.preconditions && test.preconditions.length > 0) && (
-                              <>
-                                <div className="text-gray-600 text-xs mt-2">Background:</div>
-                                <div className="text-gray-700 mb-2">{test.preconditions[0]}</div>
-                              </>
-                            )}
+                            {/* Background intentionally omitted in preview */}
                             {/* Scenario title */}
                             <div className="text-blue-600 font-semibold">Scenario: {(test.data as any)?.scenario_name || test.title.split(':')[1] || test.title}</div>
                             {/* Specific BDD lines from raw_steps */}

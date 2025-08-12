@@ -1,6 +1,6 @@
 bdd_generation:
   system_prompt: |
-    You are an expert BDD test designer. Generate comprehensive Features with realistic scenarios based on the domain and requirements provided.
+    You are an expert BDD test designer. Generate comprehensive Features with realistic scenarios based on the domain and requirements provided. IMPORTANT: Only generate domain-appropriate content - do NOT generate e-commerce features (products, cart, checkout) for generic web applications.
     
   main_prompt: |
     Generate an extensive, production-grade BDD Feature set for this requirement.
@@ -14,11 +14,18 @@ bdd_generation:
     EXAMPLE PATTERNS FOR THIS DOMAIN:
     {domain_examples}
 
+    CRITICAL DOMAIN RULES:
+    - If this is a GENERIC web application (like google.com, search engines, general websites): ONLY generate generic web testing features (navigation, search, forms, UI elements, performance)
+    - If this is an E-COMMERCE application: generate shopping features (products, cart, checkout, inventory)
+    - If this is a BANKING application: generate financial features (accounts, transfers, payments)
+    - If this is a HEALTHCARE application: generate medical features (appointments, patient data, prescriptions)
+    - NEVER mix domains - stay within the detected domain context
+
     REQUIREMENTS (STRICT):
     1. Generate 12-18 distinct BDD Features spanning the end-to-end application flow.
     2. Each Feature must have 4-8 Scenarios. At least 30% of features must include a Scenario Outline with an Examples table (2-6 rows).
     3. Use realistic, domain-appropriate data in Examples tables (IDs, ZIP codes, amounts, SKUs, dates).
-    4. Include positive, negative, and edge cases across features with varied priorities: roughly 40% P0, 30% P1, 20% P2, 10% P3. Make actions specific and verifiable (click "Add to Cart", enter ZIP "10001").
+    4. Include positive, negative, and edge cases across features with varied priorities: roughly 40% P0, 30% P1, 20% P2, 10% P3. Make actions specific and verifiable.
     5. Balance UI and API behaviors where applicable. Include field validation, permissions, idempotency, retries, and pagination.
     6. Avoid generic wording ("user performs action"). All steps must be concrete and testable.
     7. Prefer Scenario Outlines for parameterization (filters, locales, payment types, roles, etc.).
@@ -31,13 +38,13 @@ bdd_generation:
       "actor": "user role",
       "goal": "what they want to achieve", 
       "benefit": "why they want it",
-      "background": "Given common preconditions",
       "scenarios": [
         {{
           "type": "scenario",
           "name": "Scenario name",
           "steps": [
-            "When I perform action",
+            "Given I am on the application",
+            "When I perform specific action",
             "Then I see expected result"
           ]
         }},
@@ -45,6 +52,7 @@ bdd_generation:
           "type": "scenario_outline",
           "name": "Parameterized scenario name", 
           "steps": [
+            "Given I am on the application",
             "When I perform action with \"<parameter>\"",
             "Then I see result for \"<expected>\""
           ],
@@ -61,7 +69,7 @@ bdd_generation:
   fallback_prompt: |
     Generate basic BDD test scenarios for: {requirement_title}
     
-    Create 5-8 test scenarios covering:
+    Create maximum test scenarios covering:
     - Core functionality (positive cases)
     - Error handling (negative cases) 
     - Edge cases and boundaries

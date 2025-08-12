@@ -2,6 +2,7 @@
 SpecWeaver API - FastAPI backend
 """
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -242,10 +243,10 @@ async def generate_test_cases(session_id: str, req: GenerateRequest):
     try:
         requirement = sessions[session_id]["requirement"]
         
-        # Generate test cases
+        # Generate test cases (threadpool to avoid event loop conflicts)
         orchestrator = LLMOrchestrator()
         generator = TestCaseGenerator(orchestrator)
-        test_suite = generator.generate(requirement, coverage=req.coverage)
+        test_suite = await run_in_threadpool(generator.generate, requirement, req.coverage)
         
         # Save to artifacts
         suite_file = ARTIFACTS_DIR / session_id / "test_cases.json"

@@ -11,6 +11,7 @@ from .schemas import RequirementGraph, TestCase, TestStep, TestSuite
 from .llm_orchestrator import LLMOrchestrator
 from .domain_detector import DomainDetector
 from .prompt_loader import PromptLoader
+from .dynamic_test_generator import DynamicTestGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class TestCaseGenerator:
         self.orchestrator = orchestrator or LLMOrchestrator()
         self.domain_detector = DomainDetector()
         self.prompt_loader = PromptLoader()
+        self.dynamic_generator = DynamicTestGenerator()
         self.test_counter = 0
 
     def _sanitize_tags(self, tags: List[str]) -> List[str]:
@@ -55,13 +57,16 @@ class TestCaseGenerator:
         
         # Convert Features to TestCase format for compatibility
         test_cases = self._convert_features_to_test_cases(features)
+        test_cases = self._deduplicate_cases(test_cases)
         
         # If the LLM returned too few, augment deterministically to reach >= 30 scenarios
-        if len(test_cases) < 30:
-            needed = 30 - len(test_cases)
+        if len(test_cases) < 40:
+            # ensure a large, meaningful set for domain
+            needed = 40 - len(test_cases)
             supplements = self._augment_tests(requirement, needed)
             test_cases.extend(supplements)
-
+        test_cases = self._deduplicate_cases(test_cases)
+        
         # Calculate coverage metrics
         coverage_metrics = self._calculate_coverage(test_cases, requirement)
         
@@ -80,33 +85,117 @@ class TestCaseGenerator:
     def _augment_tests(self, requirement: RequirementGraph, needed: int) -> List[TestCase]:
         """Create additional negative/edge cases deterministically to reach target volume."""
         supplements: List[TestCase] = []
-        templates = [
-            ("Input validation - empty required field", "negative", "P1", [
-                "Given I am on the form page",
-                "When I submit the form with an empty required field",
-                "Then I see an inline error explaining what is required"
+        # Detect domain to pick augmentation set
+        ac_text = ' '.join([f"{ac.given} {ac.when} {ac.then}" for ac in requirement.acceptanceCriteria])
+        requirement_text = f"{requirement.title} {requirement.goal} {ac_text}"
+        url = getattr(requirement, 'url', '') or ''
+        domain = self.domain_detector.detect_domain(requirement_text, url)
+
+        # Diverse corporate-site templates
+        corporate_templates = [
+            ("Top navigation links work", "positive", "P0", [
+                "Given I am on the homepage",
+                "When I click \"Products\" in the top navigation",
+                "Then I land on the Products page"
             ]),
-            ("Expired coupon is rejected", "negative", "P1", [
-                "Given I have a coupon that is expired",
-                "When I apply the coupon",
+            ("Site search returns results", "positive", "P0", [
+                "Given I am on the homepage",
+                "When I search the site for \"firewall\"",
+                "Then I see a site results page with relevant items"
+            ]),
+            ("Resources download gated by form", "positive", "P1", [
+                "Given I am on a whitepaper resource page",
+                "When I request download",
+                "Then I am shown a lead capture form"
+            ]),
+            ("Resources form validation", "negative", "P1", [
+                "Given I am on a lead capture form",
+                "When I submit with an invalid email",
+                "Then I see an error \"Enter a valid email\""
+            ]),
+            ("Cookie consent banner can be accepted", "positive", "P2", [
+                "Given a cookie banner is displayed",
+                "When I click \"Accept All\"",
+                "Then the banner disappears"
+            ]),
+            ("Language selector switches locale", "edge", "P2", [
+                "Given I am on the homepage",
+                "When I change language to \"Deutsch\"",
+                "Then interface text updates to German"
+            ]),
+            ("Footer links open correct pages", "positive", "P2", [
+                "Given I am at the bottom of a page",
+                "When I click \"Privacy\" in the footer",
+                "Then I land on the Privacy page"
+            ]),
+            ("Contact form submits successfully", "positive", "P0", [
+                "Given I filled Name, Work Email, and Message",
+                "When I submit the contact form",
+                "Then I see a confirmation message"
+            ]),
+            ("Careers job search filters", "edge", "P2", [
+                "Given I am on the Careers page",
+                "When I filter jobs by \"Location: US\" and \"Department: Engineering\"",
+                "Then I see matching job listings"
+            ]),
+            ("Newsletter signup requires consent", "negative", "P1", [
+                "Given I am on a signup module",
+                "When I submit without consenting to terms",
+                "Then I see an error indicating consent is required"
+            ]),
+            ("Primary CTA navigates to request demo", "positive", "P0", [
+                "Given I am on a product landing page",
+                "When I click \"Request a Demo\"",
+                "Then I am taken to the demo request form"
+            ]),
+            ("Broken link check for hero CTAs", "edge", "P2", [
+                "Given I am on the homepage",
+                "When I click the hero CTA",
+                "Then the destination returns status 200"
+            ]),
+            ("Mobile menu opens and closes", "edge", "P2", [
+                "Given I am on a mobile viewport",
+                "When I tap the hamburger menu",
+                "Then the mobile menu expands"
+            ]),
+        ]
+
+        ecommerce_templates = [
+            ("Add to cart from PLP", "positive", "P0", [
+                "Given I am on a category listing",
+                "When I add the first item to cart",
+                "Then mini-cart shows item count increased"
+            ]),
+            ("Coupon rejected when expired", "negative", "P1", [
+                "Given my cart has eligible items",
+                "When I apply coupon \"EXPIRED50\"",
                 "Then I see a message that the coupon is no longer valid"
             ]),
-            ("Edge quantity maximum", "edge", "P2", [
-                "Given I am on a product detail page",
-                "When I set quantity to 999",
-                "Then I see an error that quantity exceeds allowed maximum"
+            ("Checkout as guest basic flow", "positive", "P0", [
+                "Given I proceed to checkout as guest",
+                "When I provide shipping and payment",
+                "Then the order is placed successfully"
             ]),
-            ("Idempotent order submission", "edge", "P2", [
-                "Given I am on the payment confirmation page",
-                "When I click 'Place Order' multiple times in quick succession",
-                "Then only a single order is created"
-            ]),
-            ("Slow network retry", "edge", "P3", [
-                "Given the network is slow",
-                "When I submit an action that supports retry",
-                "Then the client retries and completes without duplicate side-effects"
-            ])
         ]
+
+        search_templates = [
+            ("Results show tabs", "positive", "P0", [
+                "Given I searched for \"cloud security\"",
+                "Then I see tabs for \"All\", \"Images\", \"Videos\", and \"News\""
+            ]),
+            ("People also ask toggles", "edge", "P2", [
+                "Given I am on the results page",
+                "When I expand a \"People also ask\" question",
+                "Then I see an expanded answer"
+            ]),
+        ]
+
+        if domain == 'ecommerce':
+            templates = ecommerce_templates
+        elif domain == 'search_engine':
+            templates = search_templates
+        else:
+            templates = corporate_templates
         i = 0
         while len(supplements) < needed:
             title, ttype, prio, steps_lines = templates[i % len(templates)]
@@ -124,7 +213,39 @@ class TestCaseGenerator:
         return supplements
     
     def _generate_bdd_features(self, requirement: RequirementGraph, coverage: str) -> List[Dict[str, Any]]:
-        """Generate comprehensive BDD Features with Scenarios using LLM"""
+        """Generate comprehensive BDD Features with Scenarios using LLM or dynamic scraping"""
+        
+        # Check if we have a URL for dynamic generation
+        url = getattr(requirement, 'url', '') or ''
+        logger.info(f"Requirement URL: '{url}' (type: {type(url)})")
+        
+        if url and url.startswith(('http://', 'https://')):
+            logger.info(f"URL detected: {url}. Using dynamic test generation based on actual website structure.")
+            try:
+                # Use dynamic generation based on actual website scraping
+                logger.info("Starting dynamic generation...")
+                features = self.dynamic_generator.generate_tests_from_website(url, headless=True)
+                logger.info(f"Dynamic generation completed. Features: {len(features) if features else 0}")
+                
+                if features and len(features) > 0:
+                    logger.info(f"Dynamic generation successful. Generated {len(features)} features.")
+                    return features
+                else:
+                    logger.warning("Dynamic generation returned no features, falling back to LLM generation.")
+            except Exception as e:
+                logger.error(f"Dynamic generation failed with error: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                logger.info("Falling back to LLM generation.")
+        else:
+            logger.info(f"No valid URL found. URL value: '{url}'. Using LLM generation.")
+        
+        # Fall back to LLM-based generation
+        logger.info("Using LLM-based test generation.")
+        return self._generate_llm_bdd_features(requirement, coverage)
+    
+    def _generate_llm_bdd_features(self, requirement: RequirementGraph, coverage: str) -> List[Dict[str, Any]]:
+        """Generate BDD features using LLM (original method)"""
         
         # Detect domain from requirement
         ac_text = ' '.join([f"{ac.given} {ac.when} {ac.then}" for ac in requirement.acceptanceCriteria])
@@ -240,108 +361,193 @@ class TestCaseGenerator:
         def scen(name: str, steps: List[str]) -> Dict[str, Any]:
             return {"type": "scenario", "name": name, "steps": steps}
 
-        if domain == 'generic':
+        if domain in ('generic', 'search_engine'):
             # Generic application testing with Scenario Outlines
             features.append({
-                "feature_name": "Page Navigation",
+                "feature_name": "Google Home Page" if domain == 'search_engine' else "Page Navigation",
                 "actor": "user",
-                "goal": "navigate through the website",
+                "goal": "load and use the home page" if domain == 'search_engine' else "navigate through the website",
                 "benefit": "access different sections",
-                "background": "Given the website is accessible",
                 "scenarios": [
                     {
                         "type": "scenario_outline", 
-                        "name": "Navigate to different sections", 
+                        "name": "Home page loads with key UI elements" if domain == 'search_engine' else "Navigate to different sections", 
                         "steps": [
-                            "Given I am on the homepage",
-                            "When I click on the \"<section>\" link",
-                            "Then I should be taken to the \"<expected_page>\" page",
-                            "And the page content should load completely"
+                            "Given I am on the Google home page" if domain == 'search_engine' else "Given I am on the homepage",
+                            "Then I should see the Google logo" if domain == 'search_engine' else "Then the page content should load completely",
+                            "And I should see a single search input box" if domain == 'search_engine' else "",
+                            "And I should see a \"Google Search\" button" if domain == 'search_engine' else "",
+                            "And I should see an \"I'm Feeling Lucky\" button" if domain == 'search_engine' else ""
                         ], 
-                        "examples": [
-                            {"section": "About", "expected_page": "About Us"},
-                            {"section": "Contact", "expected_page": "Contact"},
-                            {"section": "Services", "expected_page": "Services"}
-                        ]
+                        "examples": []
                     },
-                    scen("Load homepage successfully", [
-                        "Given I navigate to the homepage",
-                        "When the page loads",
-                        "Then all main elements are visible",
-                        "And the page is fully interactive"
-                    ])
+                    {
+                        "type": "scenario",
+                        "name": "Submitting a query with Enter" if domain == 'search_engine' else "Load homepage successfully", 
+                        "steps": [
+                            "When I type \"kittens\" into the search input" if domain == 'search_engine' else "When the page loads",
+                            "And I press Enter" if domain == 'search_engine' else "Then all main elements are visible",
+                            "Then I should land on the search results page for \"kittens\"" if domain == 'search_engine' else "And the page is fully interactive"
+                        ]
+                    }
                 ]
             })
             
-            features.append({
-                "feature_name": "Search Functionality",
-                "actor": "user", 
-                "goal": "search for information",
-                "benefit": "find relevant content",
-                "background": "Given I am on a page with search functionality",
-                "scenarios": [
-                    {
-                        "type": "scenario_outline", 
-                        "name": "Perform search with different queries", 
-                        "steps": [
-                            "Given I am on the search page",
-                            "When I enter \"<query>\" in the search box",
-                            "And I click the search button",
-                            "Then I should see search results for \"<query>\"",
-                            "And the results should be relevant to the query"
-                        ], 
-                        "examples": [
-                            {"query": "test query"},
-                            {"query": "example search"},
-                            {"query": "sample text"}
-                        ]
-                    },
-                    scen("Handle empty search", [
-                        "Given I am on the search page",
-                        "When I click search without entering a query",
-                        "Then I should see a message asking for input",
-                        "And no results should be displayed"
-                    ])
-                ]
-            })
+            if domain == 'search_engine':
+                features.extend([
+                    {"feature_name": "Basic Web Search", "actor": "user", "goal": "search for information", "benefit": "find relevant content", "scenarios": [
+                        {"type": "scenario", "name": "Basic query returns a results page", "steps": [
+                            "Given I am on the Google home page",
+                            "When I search for \"selenium webdriver\"",
+                            "Then I should see a results page with organic results",
+                            "And the \"All\" tab should be selected"
+                        ]},
+                        {"type": "scenario", "name": "Query is case-insensitive", "steps": [
+                            "Given I am on the Google home page",
+                            "When I search for \"Python\"",
+                            "Then I should see similar results as searching for \"python\""
+                        ]},
+                        {"type": "scenario", "name": "Special characters are handled", "steps": [
+                            "Given I am on the Google home page",
+                            "When I search for \"C++ tutorial\"",
+                            "Then I should see results relevant to \"C++ tutorial\""
+                        ]}
+                    ]},
+                    {"feature_name": "Autocomplete & Suggestions", "actor": "user", "goal": "receive query suggestions", "benefit": "type faster", "scenarios": [
+                        {"type": "scenario", "name": "Suggestions appear while typing", "steps": [
+                            "Given I am on the Google home page",
+                            "When I type \"indi\" into the search input",
+                            "Then I should see a suggestions list beneath the input"
+                        ]},
+                        {"type": "scenario", "name": "Dismissing suggestions with Escape", "steps": [
+                            "Given suggestions are visible",
+                            "When I press Escape",
+                            "Then the suggestions list should close"
+                        ]}
+                    ]},
+                    {"feature_name": "Results Page Layout", "actor": "user", "goal": "view SERP", "benefit": "navigate results", "scenarios": [
+                        {"type": "scenario", "name": "Search box retains the query", "steps": [
+                            "Given I have searched for \"best programming languages\"",
+                            "Then the search input should contain \"best programming languages\""
+                        ]},
+                        {"type": "scenario", "name": "Tabs for verticals are present", "steps": [
+                            "Given I have searched for \"best programming languages\"",
+                            "Then I should see tabs for \"All\", \"Images\", \"Videos\", and \"News\""
+                        ]}
+                    ]}
+                ])
             
         elif domain == 'ecommerce':
-            # E-commerce fallback (existing logic)
+            # E-commerce fallback: provide rich baseline (PLP, PDP, Cart, Coupon, Checkout, Payment)
             features.append({
                 "feature_name": "Homepage & Global Navigation",
                 "actor": "shopper",
                 "goal": "discover products and actions",
                 "benefit": "shop efficiently",
-                "background": "Given the site is available",
                 "scenarios": [
-                    scen("Render homepage for a first-time visitor", [
+                    {"type": "scenario", "name": "Render homepage for a first-time visitor", "steps": [
                         "When I open the homepage",
                         "Then I see the cookie consent banner",
                         "And I see the primary navigation and search"
-                    ]),
-                    scen("Accept cookie consent", [
-                        "Given I have not previously set consent",
-                        "When I accept cookies",
-                        "Then my consent is recorded"
-                    ]),
-                    {
-                        "type": "scenario_outline", 
-                        "name": "Navigate to category", 
-                        "steps": [
-                            "Given I am on the homepage",
-                            "When I select the \"<category>\" menu item",
-                            "Then I land on the \"<expected_page>\" listing page",
-                            "And the page displays relevant products"
-                        ], 
-                        "examples": [
-                            {"category": "Men > Shoes", "expected_page": "Men Shoes"},
-                            {"category": "Women > Dresses", "expected_page": "Women Dresses"},
-                            {"category": "Electronics", "expected_page": "Electronics"}
-                        ]
-                    }
+                    ]},
+                    {"type": "scenario_outline", "name": "Navigate to category", "steps": [
+                        "Given I am on the homepage",
+                        "When I select the \"<category>\" menu item",
+                        "Then I land on the \"<expected_page>\" listing page"
+                    ], "examples": [
+                        {"category": "Women > Tops", "expected_page": "Women Tops"},
+                        {"category": "Men > Hoodies", "expected_page": "Men Hoodies"}
+                    ]}
                 ]
             })
-            # Add more e-commerce specific features in separate modules; keep fallback minimal
+
+            features.append({
+                "feature_name": "Product Listing Page (PLP)",
+                "actor": "shopper",
+                "goal": "filter and sort products",
+                "benefit": "find items quickly",
+                "scenarios": [
+                    {"type": "scenario_outline", "name": "Apply facet and sort", "steps": [
+                        "Given I navigate to the \"<category>\" category",
+                        "When I apply facet \"<facet>\" with value \"<value>\"",
+                        "And I sort by \"<sortOption>\"",
+                        "Then the product grid shows items matching \"<facet>\"=\"<value>\"",
+                        "And results are ordered by \"<sortOption>\""
+                    ], "examples": [
+                        {"category": "Women > Tops", "facet": "Color", "value": "Black", "sortOption": "Price: Low to High"},
+                        {"category": "Men > Hoodies", "facet": "Size", "value": "M", "sortOption": "Customer Rating"}
+                    ]}
+                ]
+            })
+
+            features.append({
+                "feature_name": "Product Detail Page (PDP)",
+                "actor": "shopper",
+                "goal": "select variant and add to cart",
+                "benefit": "purchase desired item",
+                "scenarios": [
+                    {"type": "scenario_outline", "name": "Select variant and verify availability", "steps": [
+                        "Given I open the PDP for \"<baseName>\"",
+                        "When I select variant \"<variantAttr>\" = \"<variantValue>\"",
+                        "Then the availability message is \"<expectedAvailability>\""
+                    ], "examples": [
+                        {"baseName": "Push It Messenger Bag", "variantAttr": "Color", "variantValue": "Blue", "expectedAvailability": "In stock"},
+                        {"baseName": "Fusion Backpack", "variantAttr": "Color", "variantValue": "Orange", "expectedAvailability": "Out of stock"}
+                    ]},
+                    {"type": "scenario", "name": "Add to cart from PDP", "steps": [
+                        "Given I am on the PDP for \"Fusion Backpack\"",
+                        "When I add quantity 1 to the cart",
+                        "Then the mini-cart shows item count increased"
+                    ]}
+                ]
+            })
+
+            features.append({
+                "feature_name": "Cart",
+                "actor": "shopper",
+                "goal": "review and update cart",
+                "benefit": "proceed to checkout",
+                "scenarios": [
+                    {"type": "scenario", "name": "Open mini-cart and view contents", "steps": [
+                        "Given I have added an item to the cart",
+                        "When I open the mini-cart",
+                        "Then I see line items and subtotal"
+                    ]},
+                    {"type": "scenario_outline", "name": "Update quantity in cart", "steps": [
+                        "Given my cart contains SKU \"<sku>\"",
+                        "When I update quantity to <qty>",
+                        "Then the line subtotal reflects the change"
+                    ], "examples": [
+                        {"sku": "24-MB02", "qty": 2},
+                        {"sku": "24-MB02", "qty": 3}
+                    ]},
+                    {"type": "scenario", "name": "Apply coupon code", "steps": [
+                        "Given my cart contains eligible items",
+                        "When I apply coupon \"WELCOME10\"",
+                        "Then totals reflect the coupon"
+                    ]}
+                ]
+            })
+
+            features.append({
+                "feature_name": "Checkout",
+                "actor": "guest",
+                "goal": "place order as guest",
+                "benefit": "complete purchase",
+                "scenarios": [
+                    {"type": "scenario_outline", "name": "Guest checkout with shipping and payment", "steps": [
+                        "Given I proceed to checkout as \"guest\"",
+                        "And I provide shipping address: <shipName>, <shipPostal>",
+                        "When I select shipping method \"<shippingMethod>\"",
+                        "And I select payment method \"<paymentMethod>\"",
+                        "And I place the order",
+                        "Then the order is created with status \"Placed\""
+                    ], "examples": [
+                        {"shipName": "Guest User", "shipPostal": "78701", "shippingMethod": "Standard", "paymentMethod": "Card"},
+                        {"shipName": "Guest User", "shipPostal": "600006", "shippingMethod": "Express", "paymentMethod": "Wallet"}
+                    ]}
+                ]
+            })
             
         else:
             # For other domains (banking, healthcare), use generic fallback
@@ -376,61 +582,69 @@ class TestCaseGenerator:
             scenarios = feature.get("scenarios", [])
             
             for i, scenario in enumerate(scenarios):
-                self.test_counter += 1
                 scenario_name = scenario.get("name", f"Scenario {i+1}")
                 scenario_type = scenario.get("type", "scenario")
                 steps = scenario.get("steps", [])
-                
-                # Determine test type and priority heuristically
-                lower = scenario_name.lower()
-                if any(w in lower for w in ["invalid", "error", "fail", "expired", "decline", "unauthorized", "empty", "missing", "format"]):
-                    test_type = "negative"
-                    priority = "P1"
-                elif any(w in lower for w in ["edge", "boundary", "maximum", "minimum", "limit", "timeout", "retry"]):
-                    test_type = "edge"
-                    priority = "P2"
-                else:
-                    test_type = "positive"
-                    priority = "P0"
-                
-                # Create test steps
-                test_steps = []
-                for step in steps:
-                    # Parse step into action and params
-                    action = self._parse_step_to_action(step)
-                    test_steps.append(TestStep(action=action["action"], params=action["params"]))
-                
-                # Generate examples data if it's a scenario outline
-                examples_data = {}
-                if scenario_type == "scenario_outline" and "examples" in scenario:
-                    examples_data = {"examples": scenario["examples"], "scenario_type": "scenario_outline"}
-                # Preserve raw BDD step lines for accurate rendering/synthesis
-                if steps:
-                    # Keep the original Given/When/Then/And lines
-                    examples_data.update({"raw_steps": steps, "scenario_name": scenario_name})
-                    if scenario_type == "scenario_outline":
-                        examples_data["scenario_type"] = "scenario_outline"
-                
-                # Build tags (include priority/type for one-line tag header)
-                raw_tags = [
-                    f"{priority}", test_type, scenario_type,
-                    feature_name.lower().replace(" ", "_")
-                ]
-                tags = self._sanitize_tags(raw_tags)
 
-                test_case = TestCase(
-                    id=f"TC-{feature_name.replace(' ', '').replace('&', '').upper()[:8]}-{self.test_counter:03d}",
-                    title=f"{feature_name}: {scenario_name}",
-                    priority=priority,
-                    type=test_type,
-                    traceTo=["AC-1"],  # Link to first AC by default
-                    preconditions=[feature.get("background", "Given the system is ready")],
-                    steps=test_steps,
-                    data=examples_data,
-                    expected=[f"Scenario '{scenario_name}' completes successfully"],
-                    tags=tags
-                )
-                test_cases.append(test_case)
+                def classify(name: str) -> tuple[str, str]:
+                    lower = name.lower()
+                    if any(w in lower for w in ["invalid", "error", "fail", "expired", "decline", "unauthorized", "empty", "missing", "format"]):
+                        return ("negative", "P1")
+                    if any(w in lower for w in ["edge", "boundary", "maximum", "minimum", "limit", "timeout", "retry"]):
+                        return ("edge", "P2")
+                    return ("positive", "P0")
+
+                if scenario_type == "scenario_outline" and isinstance(scenario.get("examples"), list) and scenario["examples"]:
+                    for ex_idx, example in enumerate(scenario["examples"], 1):
+                        # Replace <param> with values in raw steps
+                        replaced_steps: List[str] = []
+                        for line in steps:
+                            new_line = line
+                            if isinstance(example, dict):
+                                for k, v in example.items():
+                                    new_line = new_line.replace(f"<{k}>", str(v))
+                            replaced_steps.append(new_line)
+                        ttype, prio = classify(scenario_name)
+                        # Build parsed step actions
+                        test_steps = []
+                        for s in replaced_steps:
+                            action = self._parse_step_to_action(s)
+                            test_steps.append(TestStep(action=action["action"], params=action["params"]))
+                        self.test_counter += 1
+                        tags = self._sanitize_tags([prio, ttype, "scenario", feature_name.lower().replace(" ", "_")])
+                        test_cases.append(TestCase(
+                            id=f"TC-{feature_name.replace(' ', '').replace('&', '').upper()[:8]}-{self.test_counter:03d}",
+                            title=f"{feature_name}: {scenario_name} [{ex_idx}]",
+                            priority=prio,
+                            type=ttype,
+                            traceTo=["AC-1"],
+                            preconditions=[feature.get("background", "Given the system is ready")],
+                            steps=test_steps,
+                            data={"raw_steps": replaced_steps, "scenario_name": f"{scenario_name} [{ex_idx}]"},
+                            expected=[f"Scenario '{scenario_name} [{ex_idx}]' completes successfully"],
+                            tags=tags
+                        ))
+                else:
+                    ttype, prio = classify(scenario_name)
+                    # Build parsed step actions
+                    test_steps = []
+                    for s in steps:
+                        action = self._parse_step_to_action(s)
+                        test_steps.append(TestStep(action=action["action"], params=action["params"]))
+                    self.test_counter += 1
+                    tags = self._sanitize_tags([prio, ttype, scenario_type, feature_name.lower().replace(" ", "_")])
+                    test_cases.append(TestCase(
+                        id=f"TC-{feature_name.replace(' ', '').replace('&', '').upper()[:8]}-{self.test_counter:03d}",
+                        title=f"{feature_name}: {scenario_name}",
+                        priority=prio,
+                        type=ttype,
+                        traceTo=["AC-1"],
+                        preconditions=[feature.get("background", "Given the system is ready")],
+                        steps=test_steps,
+                        data={"raw_steps": steps, "scenario_name": scenario_name},
+                        expected=[f"Scenario '{scenario_name}' completes successfully"],
+                        tags=tags
+                    ))
         
         return test_cases
     
@@ -501,7 +715,8 @@ class TestCaseGenerator:
         
         # Use LLM to break down the AC into steps
         domain_examples = ""
-        if "ecommerce" in req.title.lower() or "commerce" in req.title.lower():
+        domain_hint = (req.domain or "").lower()
+        if domain_hint == "ecommerce" or any(k in (req.title or "").lower() for k in ["ecommerce", "cart", "checkout", "order"]):
             domain_examples = """
 E-COMMERCE SPECIFIC ACTIONS:
 - navigation.goto_page: {"url": "https://example.com/category/shoes"}
@@ -724,6 +939,7 @@ Return ONLY the JSON array of specific, actionable steps.
         seen = set()
         unique = []
         
+        title_seen = set()
         for case in cases:
             # Create signature from steps and data (handle nested dicts)
             data_signature = []
@@ -734,6 +950,9 @@ Return ONLY the JSON array of specific, actionable steps.
                     for k, v in case.data.items():
                         if isinstance(v, dict):
                             flat_data[k] = str(v)  # Convert nested dicts to strings
+                        elif isinstance(v, list):
+                            # Convert lists to tuples of strings for hashing
+                            flat_data[k] = tuple(str(item) for item in v)
                         else:
                             flat_data[k] = v
                     data_signature = tuple(sorted(flat_data.items()))
@@ -743,12 +962,14 @@ Return ONLY the JSON array of specific, actionable steps.
             
             signature = (
                 case.type,
-                tuple(step.action for step in case.steps),
+                (tuple(step.action for step in case.steps), case.data.get("scenario_name") if isinstance(case.data, dict) else None),
                 data_signature
             )
+            simple_title = case.title.strip().lower()
             
-            if signature not in seen:
+            if signature not in seen and simple_title not in title_seen:
                 seen.add(signature)
+                title_seen.add(simple_title)
                 unique.append(case)
         
         return unique

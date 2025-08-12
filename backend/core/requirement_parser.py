@@ -71,14 +71,49 @@ class RequirementParser:
             return text[s_arr: e_arr + 1]
         return text
 
+    def _coerce_gwt_from_text(self, text: str) -> tuple[str, str, str]:
+        """Best-effort extraction of Given/When/Then from a description string."""
+        try:
+            # Simple regex for Given/When/Then order
+            m = re.search(r"Given\s+(.+?)\s+When\s+(.+?)\s+Then\s+(.+)", text, re.IGNORECASE | re.DOTALL)
+            if m:
+                return m.group(1).strip(), m.group(2).strip(), m.group(3).strip()
+        except Exception:
+            pass
+        # Fallback generic
+        return ("the system is ready", "user performs the action", "the expected outcome occurs")
+
     def _extract_story_parts(self, story: str) -> Dict[str, Any]:
         """Extract parts from user story using regex"""
         parts = {
             "actor": "",
             "goal": "",
             "benefit": "",
-            "acceptance_criteria": []
+            "acceptance_criteria": [],
+            "url": ""
         }
+        
+        # Extract URL if present
+        url_pattern = r'https?://[^\s]+'
+        url_match = re.search(url_pattern, story)
+        if url_match:
+            parts["url"] = url_match.group(0)
+            logger.info(f"Extracted URL: {parts['url']}")
+        else:
+            # Also try to extract domain-like patterns
+            domain_pattern = r'(?:test|check|verify)\s+(?:the\s+)?(?:website\s+)?(?:at\s+)?(?:https?://)?([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})'
+            domain_match = re.search(domain_pattern, story, re.IGNORECASE)
+            if domain_match:
+                domain = domain_match.group(1)
+                if not domain.startswith(('http://', 'https://')):
+                    parts["url"] = f"https://{domain}"
+                else:
+                    parts["url"] = domain
+                logger.info(f"Extracted domain URL: {parts['url']}")
+            else:
+                logger.info("No URL or domain found in input")
+        
+        logger.info(f"Final extracted parts: {parts}")
         
         # Try to match "As a... I want... so that..." pattern
         story_pattern = r"As a\s+(.+?)[,\s]+I want\s+(.+?)\s+so that\s+(.+?)(?:\.|$)"
@@ -170,8 +205,11 @@ Return ONLY valid JSON matching the RequirementGraph schema.
         elif not story_text:
             raise ValueError("Either story_path or story_text must be provided")
         
+        logger.info(f"Parsing story text: {story_text[:100]}...")
+        
         # Extract parts using regex
         extracted = self._extract_story_parts(story_text)
+        logger.info(f"Extracted parts: {extracted}")
         
         # Build prompt
         prompt = self._build_prompt(story_text, extracted)
@@ -205,12 +243,80 @@ Focus on clarity, completeness, and testability of acceptance criteria."""
             if not raw:
                 raise ValueError("Empty LLM response")
             data = json.loads(raw)
+            
+            # Coerce/normalize common LLM schema deviations before validation
+            try:
+                # actor, title, goal, benefit may come as objects
+                if isinstance(data.get("actor"), dict):
+                    actor_obj = data.get("actor") or {}
+                    data["actor"] = actor_obj.get("name") or actor_obj.get("role") or actor_obj.get("value") or "user"
+                if isinstance(data.get("title"), dict):
+                    data["title"] = data["title"].get("text") or data["title"].get("value") or "User Story"
+                if isinstance(data.get("goal"), dict):
+                    data["goal"] = data["goal"].get("text") or data["goal"].get("value") or "perform action"
+                if isinstance(data.get("benefit"), dict):
+                    data["benefit"] = data["benefit"].get("text") or data["benefit"].get("value") or "achieve outcome"
+                # version as string
+                if "version" in data and not isinstance(data["version"], str):
+                    data["version"] = str(data["version"]) 
+                # acceptanceCriteria coercion
+                ac_list = data.get("acceptanceCriteria") or []
+                coerced_ac = []
+                for i, ac in enumerate(ac_list, 1):
+                    if not isinstance(ac, dict):
+                        # try to parse from a text line
+                        text = str(ac)
+                        given, when, then = self._coerce_gwt_from_text(text)
+                        coerced_ac.append({"id": f"AC-{i}", "given": given, "when": when, "then": then})
+                        continue
+                    g = ac.get("given") or ac.get("Given")
+                    w = ac.get("when") or ac.get("When")
+                    t = ac.get("then") or ac.get("Then")
+                    if not (g and w and t):
+                        # try description field
+                        desc = ac.get("description") or ac.get("text") or ""
+                        if desc:
+                            g2, w2, t2 = self._coerce_gwt_from_text(desc)
+                            g = g or g2
+                            w = w or w2
+                            t = t or t2
+                    coerced_ac.append({
+                        "id": ac.get("id") or f"AC-{i}",
+                        "given": g or "the system is ready",
+                        "when": w or "user performs the action",
+                        "then": t or "the expected outcome occurs"
+                    })
+                if coerced_ac:
+                    data["acceptanceCriteria"] = coerced_ac
+            except Exception:
+                logger.exception("Parser: normalization step failed; proceeding with raw data")
+
+            # Ensure URL is preserved from extracted parts
+            if extracted.get("url") and not data.get("url"):
+                data["url"] = extracted["url"]
+                logger.info(f"Added extracted URL to LLM response: {data['url']}")
+            
+            # Repair domainEntities if needed
+            if "domainEntities" in data and isinstance(data["domainEntities"], list):
+                repaired_entities = []
+                for ent in data["domainEntities"]:
+                    if isinstance(ent, str):
+                        repaired_entities.append({
+                            "name": ent,
+                            "description": f"Extracted entity: {ent}"
+                        })
+                    elif isinstance(ent, dict):
+                        repaired_entities.append(ent)
+                data["domainEntities"] = repaired_entities
+            
             # Add metadata
             data["provider_metadata"] = {
                 "provider": response.provider.value,
                 "model": response.model,
                 "latency_ms": response.latency_ms
             }
+            
+            logger.info(f"Final RequirementGraph data: {data}")
             return RequirementGraph(**data)
         except Exception as e:
             logger.error(f"Failed to create RequirementGraph: {e}")
@@ -225,6 +331,7 @@ Focus on clarity, completeness, and testability of acceptance criteria."""
             "actor": extracted.get("actor", "user"),
             "goal": extracted.get("goal", "perform action"),
             "benefit": extracted.get("benefit", "achieve outcome"),
+            "url": extracted.get("url", ""),
             "acceptanceCriteria": [],
             "domainEntities": [],
             "assumptions": [],
@@ -269,13 +376,10 @@ Focus on clarity, completeness, and testability of acceptance criteria."""
             actor=extracted.get("actor", "user"),
             goal=extracted.get("goal", "perform action"),
             benefit=extracted.get("benefit", "achieve outcome"),
+            url=extracted.get("url", ""),
             acceptanceCriteria=[
-                AcceptanceCriteria(
-                    id="AC-1",
-                    given="the system is ready",
-                    when="user performs the action",
-                    then="the expected outcome occurs"
-                )
+                AcceptanceCriteria(id="AC-1", given="the system is ready", when="user performs the action", then="the expected outcome occurs"),
+                AcceptanceCriteria(id="AC-2", given="the application is accessible", when="I navigate to the homepage", then="the homepage loads successfully"),
             ],
             domainEntities=[],
             assumptions=["System is accessible", "User has valid credentials"],

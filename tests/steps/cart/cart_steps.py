@@ -1,6 +1,6 @@
 """
 Generated step definitions for test the application
-Generated at: 2025-08-12T05:52:18.082461
+Generated at: 2025-08-12T08:19:27.272801
 """
 from pytest_bdd import given, when, then, scenarios, parsers
 from playwright.sync_api import Page, expect
