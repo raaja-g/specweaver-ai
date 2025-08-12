@@ -36,6 +36,7 @@ class RequirementGraph(BaseModel):
     risks: List[str] = Field(default_factory=list, description="Potential risks")
     tags: List[str] = Field(default_factory=list, description="Tags for categorization")
     url: Optional[str] = Field(None, description="URL of the application to test (for dynamic generation)")
+    raw_text: Optional[str] = Field(None, description="Original user input to pass directly to LLM for BDD generation")
     domain: Optional[str] = Field(None, description="Domain hint")
     version: str = Field(default="1.0.0", description="Schema version")
     created_at: datetime = Field(default_factory=datetime.utcnow)

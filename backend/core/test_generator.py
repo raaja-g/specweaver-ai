@@ -26,6 +26,39 @@ class TestCaseGenerator:
         self.dynamic_generator = DynamicTestGenerator()
         self.test_counter = 0
 
+    def _intent_keywords(self, requirement: RequirementGraph) -> set:
+        text = f"{requirement.title} {requirement.goal} {requirement.benefit}".lower()
+        keys = set()
+        for k in ["checkout", "cart", "payment", "shipping", "order", "coupon"]:
+            if k in text:
+                keys.add(k)
+        return keys
+
+    def _apply_intent_filter(self, requirement: RequirementGraph, features: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """If the user's intent mentions specific flows (e.g., checkout), keep only relevant features."""
+        intents = self._intent_keywords(requirement)
+        if not intents:
+            return features
+        key_to_patterns = {
+            "checkout": ["checkout", "payment", "order"],
+            "cart": ["cart", "mini-cart", "basket"],
+            "payment": ["payment", "card", "wallet"],
+            "shipping": ["shipping", "address"],
+            "order": ["order", "confirmation"],
+            "coupon": ["coupon", "discount", "promo"],
+        }
+        patterns = []
+        for k in intents:
+            patterns.extend(key_to_patterns.get(k, [k]))
+        patterns = [p.lower() for p in patterns]
+        filtered: List[Dict[str, Any]] = []
+        for f in features:
+            name = str(f.get("feature_name", "")).lower()
+            if any(p in name for p in patterns):
+                filtered.append(f)
+        # If filter removed everything, fall back to original list
+        return filtered or features
+
     def _sanitize_tags(self, tags: List[str]) -> List[str]:
         """Sanitize and de-duplicate tags for Gherkin (@tag)."""
         seen = set()
@@ -213,7 +246,29 @@ class TestCaseGenerator:
         return supplements
     
     def _generate_bdd_features(self, requirement: RequirementGraph, coverage: str) -> List[Dict[str, Any]]:
-        """Generate comprehensive BDD Features with Scenarios using LLM or dynamic scraping"""
+        """Generate BDD Features with Scenarios, preferring direct LLM on raw user text when available."""
+        # If original user input is available (saved by API), directly ask LLM for BDD pack
+        raw_text = getattr(requirement, 'raw_text', None)
+        if raw_text:
+            try:
+                logger.info("Direct LLM generation from raw input enabled")
+                system = self.prompt_loader.get_prompt('bdd_generation.system_prompt') or "You are an expert BDD test designer."
+                prompt = self.prompt_loader.get_prompt('bdd_generation.main_prompt',
+                    requirement_json=json.dumps({"user_input": raw_text}, indent=2),
+                    domain_context="",
+                    domain_examples="")
+                response = self.orchestrator.call(prompt=prompt, system=system, task_type="bdd_generation")
+                text = (response.content or "").strip()
+                from json import JSONDecoder
+                s_idx = text.find("[")
+                if s_idx == -1:
+                    s_idx = text.find("{")
+                dec = JSONDecoder()
+                obj, _ = dec.raw_decode(text[s_idx:])
+                feats = obj if isinstance(obj, list) else [obj]
+                return feats
+            except Exception as e:
+                logger.warning(f"Direct LLM generation failed: {e}; falling back to existing pipeline")
         
         # Check if we have a URL for dynamic generation
         url = getattr(requirement, 'url', '') or ''
@@ -242,7 +297,10 @@ class TestCaseGenerator:
         
         # Fall back to LLM-based generation
         logger.info("Using LLM-based test generation.")
-        return self._generate_llm_bdd_features(requirement, coverage)
+        feats = self._generate_llm_bdd_features(requirement, coverage)
+        # Apply intent filter (e.g., user asked only for checkout)
+        feats = self._apply_intent_filter(requirement, feats)
+        return feats
     
     def _generate_llm_bdd_features(self, requirement: RequirementGraph, coverage: str) -> List[Dict[str, Any]]:
         """Generate BDD features using LLM (original method)"""
@@ -529,7 +587,7 @@ class TestCaseGenerator:
                 ]
             })
 
-            features.append({
+            checkout_pack = {
                 "feature_name": "Checkout",
                 "actor": "guest",
                 "goal": "place order as guest",
@@ -547,7 +605,16 @@ class TestCaseGenerator:
                         {"shipName": "Guest User", "shipPostal": "600006", "shippingMethod": "Express", "paymentMethod": "Wallet"}
                     ]}
                 ]
-            })
+            }
+
+            # If the intent is checkout-focused, emit only checkout and cart features
+            intents = self._intent_keywords(requirement)
+            if intents and ("checkout" in intents or "payment" in intents or "order" in intents):
+                features = [f for f in features if f.get("feature_name") in {"Cart", "Checkout"}]
+                if checkout_pack not in features:
+                    features.append(checkout_pack)
+            else:
+                features.append(checkout_pack)
             
         else:
             # For other domains (banking, healthcare), use generic fallback

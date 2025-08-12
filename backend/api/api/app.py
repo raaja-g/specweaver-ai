@@ -177,7 +177,8 @@ async def upload_requirement(req: RequirementUpload):
         sessions[session_id] = {
             "requirement": requirement,
             "created_at": datetime.utcnow(),
-            "status": "parsed"
+            "status": "parsed",
+            "raw_text": req.story_text
         }
         
         return {
@@ -242,6 +243,10 @@ async def generate_test_cases(session_id: str, req: GenerateRequest):
     
     try:
         requirement = sessions[session_id]["requirement"]
+        # Pass original raw user input to generator for direct LLM BDD
+        raw_text = sessions[session_id].get("raw_text")
+        if raw_text:
+            requirement.raw_text = raw_text  # type: ignore
         
         # Generate test cases (threadpool to avoid event loop conflicts)
         orchestrator = LLMOrchestrator()
