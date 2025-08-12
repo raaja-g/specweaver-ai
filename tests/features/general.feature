@@ -1,5 +1,5 @@
 @general
-Feature: to add a product to my cart and check out with a credit card
+Feature: Auto Synthesized
 
   Scenario: View details of an in-stock product with multiple variants
     Given I am on the product page for 'TrailMax Hiking Backpack' (SKU: HBP-GRN-40L)

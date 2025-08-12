@@ -1,12 +1,10 @@
 """
-Pytest configuration, fixtures, and global catch-all BDD steps.
+Pytest configuration and fixtures
 """
-import os
 import pytest
 from playwright.sync_api import Page, Browser
 import json
 from pathlib import Path
-from pytest_bdd import given, when, then, parsers
 
 
 @pytest.fixture(scope="session")
@@ -61,28 +59,3 @@ def test_data():
             "cvv": "123"
         }
     }
-
-
-# ---------------------------------------------------------------------------
-# Optional catch-all BDD steps (off by default)
-# Enable by setting ALLOW_GENERIC_STEPS=1 to keep green while scaffolding.
-# In strict mode (default), only explicit steps will run.
-# ---------------------------------------------------------------------------
-
-ALLOW_GENERIC_STEPS = os.getenv("ALLOW_GENERIC_STEPS", "0").lower() in {"1", "true", "yes"}
-
-if ALLOW_GENERIC_STEPS:
-    @given(parsers.parse("{step_text}"))
-    def any_given_step(step_text: str):
-        print(f"[GENERIC GIVEN] {step_text}")
-        pass
-
-    @when(parsers.parse("{step_text}"))
-    def any_when_step(step_text: str):
-        print(f"[GENERIC WHEN] {step_text}")
-        pass
-
-    @then(parsers.parse("{step_text}"))
-    def any_then_step(step_text: str):
-        print(f"[GENERIC THEN] {step_text}")
-        pass

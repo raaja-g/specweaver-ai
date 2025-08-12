@@ -109,12 +109,41 @@ class CodeSynthesizer:
         """Generate feature file for specific functional area"""
         template = self.env.get_template("feature.j2")
         
+        # Collect raw Gherkin lines by type to emit explicit step bindings
+        given_lines: set[str] = set()
+        when_lines: set[str] = set()
+        then_lines: set[str] = set()
+
+        for tc in test_cases:
+            raw = getattr(tc, 'data', {}) if isinstance(getattr(tc, 'data', {}), dict) else {}
+            raw_steps = raw.get('raw_steps') or []
+            if isinstance(raw_steps, list):
+                for line in raw_steps:
+                    if not isinstance(line, str):
+                        continue
+                    s = line.strip()
+                    sl = s.lower()
+                    if sl.startswith('given '):
+                        given_lines.add(s[len('Given '):])
+                    elif sl.startswith('when '):
+                        when_lines.add(s[len('When '):])
+                    elif sl.startswith('then '):
+                        then_lines.add(s[len('Then '):])
+                    elif sl.startswith('and '):
+                        # Best effort: attach And to previous group (default Then)
+                        then_lines.add(s[len('And '):])
+
         content = template.render(
             requirement=requirement,
             test_cases=test_cases,
             functional_area=area,
             config=config,
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
+            feature_file=f"{area}.feature",
+            given_lines=sorted(given_lines),
+            when_lines=sorted(when_lines),
+            then_lines=sorted(then_lines),
+            unique_actions=sorted({step.action for tc in test_cases for step in tc.steps})
         )
         
         # Save feature file
@@ -132,13 +161,52 @@ class CodeSynthesizer:
                                config: ExecutionConfig) -> Path:
         """Generate step definitions for specific functional area"""
         template = self.env.get_template("pytest_steps.j2")
-        
+
+        # Extract raw Gherkin lines into explicit Given/When/Then sets
+        given_lines: set[str] = set()
+        when_lines: set[str] = set()
+        then_lines: set[str] = set()
+
+        for tc in test_cases:
+            raw = getattr(tc, 'data', {}) if isinstance(getattr(tc, 'data', {}), dict) else {}
+            raw_steps = raw.get('raw_steps') or []
+            if not isinstance(raw_steps, list):
+                continue
+            last_type: str | None = None
+            for line in raw_steps:
+                if not isinstance(line, str):
+                    continue
+                s = line.strip()
+                sl = s.lower()
+                if sl.startswith('given '):
+                    given_lines.add(s[len('Given '):])
+                    last_type = 'given'
+                elif sl.startswith('when '):
+                    when_lines.add(s[len('When '):])
+                    last_type = 'when'
+                elif sl.startswith('then '):
+                    then_lines.add(s[len('Then '):])
+                    last_type = 'then'
+                elif sl.startswith('and '):
+                    content_only = s[len('And '):]
+                    if last_type == 'given':
+                        given_lines.add(content_only)
+                    elif last_type == 'when':
+                        when_lines.add(content_only)
+                    else:
+                        then_lines.add(content_only)
+
         content = template.render(
             requirement=requirement,
             test_cases=test_cases,
             functional_area=area,
             config=config,
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
+            feature_file=f"{area}.feature",
+            given_lines=sorted(given_lines),
+            when_lines=sorted(when_lines),
+            then_lines=sorted(then_lines),
+            unique_actions=sorted({step.action for tc in test_cases for step in tc.steps})
         )
         
         # Save steps file
@@ -194,7 +262,9 @@ class CodeSynthesizer:
             all_preconditions=sorted(all_preconditions),
             unique_actions=sorted(unique_actions),
             all_expectations=sorted(all_expectations),
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
+            functional_area="general",
+            given_lines=[], when_lines=[], then_lines=[]
         )
         
         # Save step definitions
