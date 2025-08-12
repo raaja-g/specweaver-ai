@@ -1,6 +1,6 @@
 """
-Generated step definitions for test the e-commerce website functionality
-Generated at: 2025-08-12T13:12:51.430261
+Generated step definitions for to add a product to my cart and check out with a credit card
+Generated at: 2025-08-12T15:02:01.657693
 """
 from pytest_bdd import given, when, then, scenarios, parsers
 from playwright.sync_api import Page, expect
@@ -10,13 +10,9 @@ import httpx
 from typing import Dict, Any
 
 # Load scenarios from the specific feature file
-FEATURE_FILE = Path(__file__).resolve().parents[2] / "features" / "auth.feature"
+FEATURE_FILE = Path(__file__).resolve().parents[2] / "features" / ""
 scenarios(str(FEATURE_FILE))
 
-
-@given("I am a new user on the 'Create New Customer Account' page")
-def go_to_create_account(page: Page):
-    pass
 
 @given('the test environment is configured')
 def setup_environment(page: Page):

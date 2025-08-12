@@ -1,163 +1,163 @@
 @cart
-Feature: test the e-commerce website functionality
+Feature: to add a product to my cart and check out with a credit card
 
-  Scenario: Add a simple product to the cart from the category page
-    Given I am viewing the 'Men/Tops' category page
-    And the 'Argus All-Weather Tank' is in stock
-    When I click the 'Add to Cart' button for the 'Argus All-Weather Tank'
-    Then a success message 'You added Argus All-Weather Tank to your shopping cart.' is displayed
-    And the cart quantity indicator updates to '1'
+  Scenario: Add a single, in-stock product to an empty cart
+    Given I am logged in and viewing the product 'Waterproof Shell Jacket' (SKU: WJK-RED-M) which is in stock
+    And my shopping cart is empty
+    When I click the 'Add to Cart' button
+    Then a confirmation pop-up appears with the message 'Waterproof Shell Jacket has been added to your cart'
+    And the cart icon in the header updates to show 1 item
 
-  Scenario: Add a configurable product to the cart from its details page
-    Given I am on the product details page for 'Hero Hoodie'
-    When I select size 'M' and color 'Green'
-    And I click the 'Add to Cart' button
-    Then the mini-cart shows 'Hero Hoodie' with size 'M' and color 'Green'
-    And I see a confirmation message for adding the item
+  Scenario: Add the same product to the cart again
+    Given I have 1 'Waterproof Shell Jacket' (SKU: WJK-RED-M) in my cart
+    And I am viewing the product page for 'Waterproof Shell Jacket'
+    When I click the 'Add to Cart' button again
+    Then the cart icon in the header still shows 1 unique item
+    And when I navigate to the cart page
+    Then the quantity for 'Waterproof Shell Jacket' should be 2
 
-  Scenario: Update item quantity in the shopping cart page
-    Given I have a 'Quest Lumaflex™ Band' with quantity 1 in my cart
+  Scenario: Attempt to add an out-of-stock product to the cart
+    Given I am viewing the product 'Solar-Powered Lantern' (SKU: SPL-001) which is out of stock
+    Then the 'Add to Cart' button should be disabled
+    When I attempt to add the item to the cart via a direct API call to '/api/cart/add'
+    Then the API should return a 409 Conflict status
+    And the response body should contain an error message 'Item SKU: SPL-001 is out of stock'
+
+  Scenario: Add a specific quantity of an item to the cart [1]
+    Given I am on the product page for 'Merino Wool Socks' (SKU: MWS-GRY-L) priced at $18.50
+    When I select a quantity of '1'
+    And I click 'Add to Cart'
+    And I navigate to the cart page
+    Then the line item for 'Merino Wool Socks' should show quantity '1' and a total of '$18.50'
+
+  Scenario: Add a specific quantity of an item to the cart [2]
+    Given I am on the product page for 'Merino Wool Socks' (SKU: MWS-GRY-L) priced at $18.50
+    When I select a quantity of '3'
+    And I click 'Add to Cart'
+    And I navigate to the cart page
+    Then the line item for 'Merino Wool Socks' should show quantity '3' and a total of '$55.50'
+
+  Scenario: Add a specific quantity of an item to the cart [3]
+    Given I am on the product page for 'Merino Wool Socks' (SKU: MWS-GRY-L) priced at $18.50
+    When I select a quantity of '5'
+    And I click 'Add to Cart'
+    And I navigate to the cart page
+    Then the line item for 'Merino Wool Socks' should show quantity '5' and a total of '$92.50'
+
+  Scenario: View items in the cart
+    Given I have added a 'TrailMax Hiking Backpack' at $99.95 and two 'Energy Gel Packs' at $2.49 each to my cart
     When I navigate to the shopping cart page
-    And I change the quantity for 'Quest Lumaflex™ Band' to '3'
-    And I click the 'Update Shopping Cart' button
-    Then the subtotal for 'Quest Lumaflex™ Band' should be three times its unit price
-    And the cart grand total is updated accordingly
+    Then I should see a line item for 'TrailMax Hiking Backpack' with quantity 1 and price $99.95
+    And I should see a line item for 'Energy Gel Pack' with quantity 2 and price $4.98
+    And the cart subtotal should be displayed as '$104.93'
+
+  Scenario: Update the quantity of an item in the cart
+    Given I have a 'TrailMax Hiking Backpack' with quantity 1 in my cart
+    When I am on the shopping cart page
+    And I change the quantity for 'TrailMax Hiking Backpack' to '3'
+    Then the line item total for the backpack should update to '$299.85'
+    And the cart subtotal should update to '$299.85'
 
   Scenario: Remove an item from the cart
-    Given I have 'Push It Messenger Bag' and 'Hero Hoodie' in my cart
-    When I view the shopping cart page
-    And I click the 'Remove' icon for the 'Push It Messenger Bag'
-    Then the 'Push It Messenger Bag' is no longer listed in the cart
-    And the cart grand total is updated to reflect only the 'Hero Hoodie'
+    Given I have a 'TrailMax Hiking Backpack' and 'Merino Wool Socks' in my cart
+    When I am on the shopping cart page
+    And I click the 'Remove' button for 'Merino Wool Socks'
+    Then the 'Merino Wool Socks' line item should be removed from the cart
+    And the cart subtotal should be updated to only reflect the price of the backpack
 
-  Scenario: Attempt to add a product without selecting required options
-    Given I am on the product details page for 'Radiant Tee' which requires size and color
-    When I click the 'Add to Cart' button without selecting a size or color
-    Then I see a validation message 'This is a required field.' next to the size and color options
-    And the item is not added to the cart
+  Scenario: Cart displays a warning when item stock is low
+    Given an item 'Headlamp' (SKU: HLP-05) has only 3 units left in stock
+    And I have 2 'Headlamp' items in my cart
+    When I view the shopping cart
+    And I update the quantity for 'Headlamp' to 4
+    Then a warning message 'Only 3 units available. Quantity updated.' is displayed next to the item
+    And the quantity field for 'Headlamp' is automatically adjusted to 3
 
-  Scenario: Attempt to register with an existing email address
-    Given an account already exists for 'existing.user@example.com'
-    When I try to create a new account using the email 'existing.user@example.com'
-    Then I see an error message 'There is already an account with this email address.'
-    And I remain on the registration page
+  Scenario: Cart contents persist after logging out and back in
+    Given I am a logged-in shopper
+    And I have added a 'Waterproof Shell Jacket' to my cart
+    When I log out of my account
+    And I log back in with the same credentials
+    And I navigate to the shopping cart page
+    Then I should see the 'Waterproof Shell Jacket' in my cart
 
-  Scenario: Login with an invalid email address format [1]
-    Given I am on the customer login page
-    When I enter 'plainaddress' in the email field and any password
-    And I click the 'Sign In' button
-    Then I see a client-side validation message 'Please enter a valid email address (Ex: johndoe@domain.com).'
+  Scenario: Merging guest cart with account cart upon login
+    Given I am not logged in and have a 'Fleece Pullover' in my guest cart
+    And my registered account cart contains a 'Hiking Boot' from a previous session
+    When I log into my account
+    And I navigate to the shopping cart page
+    Then my cart should contain both the 'Fleece Pullover' and the 'Hiking Boot'
 
-  Scenario: Login with an invalid email address format [2]
-    Given I am on the customer login page
-    When I enter '@missingusername.com' in the email field and any password
-    And I click the 'Sign In' button
-    Then I see a client-side validation message 'Please enter a valid email address (Ex: johndoe@domain.com).'
+  Scenario: Cart item is removed if it goes out of stock between sessions
+    Given I am a logged-in shopper with a 'Limited Edition Tent' in my cart
+    And I log out
+    And an administrator marks the 'Limited Edition Tent' as out of stock
+    When I log back into my account
+    And I view my cart
+    Then the cart should be empty
+    And I should see a message 'Some items in your cart are no longer available and have been removed.'
 
-  Scenario: Login with an invalid email address format [3]
-    Given I am on the customer login page
-    When I enter 'username@.com' in the email field and any password
-    And I click the 'Sign In' button
-    Then I see a client-side validation message 'Please enter a valid email address (Ex: johndoe@domain.com).'
+  Scenario: Cart is cleared after a successful order
+    Given I am a logged-in shopper with items in my cart
+    When I successfully complete the checkout process and place an order
+    And I navigate back to the shopping cart page
+    Then my cart should be empty
+    And I should see a message 'Your cart is empty.'
 
-  Scenario: Apply a valid promotional code in the cart
-    Given I have items in my shopping cart totaling over $50.00
-    And a valid 10% discount code 'LUMA10' exists
-    When I expand the 'Apply Discount Code' section in the cart
-    And I enter 'LUMA10' and click 'Apply Discount'
-    Then a success message is shown
-    And the cart summary displays a 'Discount' row with the correct calculated amount
-    And the order total is reduced
+  Scenario: Enter a new valid shipping address
+    Given I am on the shipping address step of the checkout
+    When I fill in the shipping address form with valid data for 'Jane Doe'
+    And I click the 'Continue to Shipping Method' button
+    Then I should be taken to the shipping method selection page
 
-  Scenario: Remove an applied promotional code
-    Given I have successfully applied the discount code 'LUMA10' to my cart
-    When I click the 'Cancel' link next to the applied discount code
-    Then the 'Discount' row is removed from the cart summary
-    And the order total reverts to the original amount
+  Scenario: Select a previously saved shipping address
+    Given I am a logged-in shopper with a saved address for '123 Main St, Anytown, USA 12345'
+    And I am on the shipping address step of the checkout
+    When I select the saved address '123 Main St'
+    And I click the 'Continue to Shipping Method' button
+    Then the shipping details are pre-filled
+    And I am taken to the shipping method selection page
 
-  Scenario: Add a new address to the address book
-    Given I am logged in and on the 'Address Book' page
-    When I click 'Add New Address'
-    And I fill in the form with valid details for a new address, e.g., 'Work Office'
-    And I click 'Save Address'
-    Then I am redirected back to the 'Address Book' page
-    And the newly added 'Work Office' address is listed
+  Scenario: Address validation service suggests a correction
+    Given I am on the shipping address step of the checkout
+    When I enter '123 Main Stret' and ZIP code '90210'
+    And I click 'Continue to Shipping Method'
+    Then I should see a suggestion: 'Did you mean 123 Main Street, Beverly Hills, CA 90210?'
+    And I should have options to 'Use Suggested Address' or 'Use Address as Entered'
 
-  Scenario: Edit an existing address
-    Given I have a saved 'Home' address in my address book
-    When I click 'Edit Address' for my 'Home' address
-    And I update the street address from '123 Main St' to '456 Oak Ave'
-    And I click 'Save Address'
-    Then the address book shows the updated street '456 Oak Ave' for my 'Home' address
+  Scenario: Shipping address form field validation [1]
+    Given I am on the shipping address step of the checkout
+    When I fill in the form but leave the 'First Name' blank
+    And I click 'Continue to Shipping Method'
+    Then I should see a validation error 'First Name is required.' next to the field
 
-  Scenario: Change the default billing address
-    Given I have two addresses, 'Home' and 'Work', and 'Home' is the default billing address
-    When I navigate to the 'Address Book' page
-    And I click 'Change Billing Address' and select the 'Work' address
-    And I save the change
-    Then the 'Work' address is now marked as the 'Default Billing Address'
+  Scenario: Shipping address form field validation [2]
+    Given I am on the shipping address step of the checkout
+    When I fill in the form but leave the 'Street Address' blank
+    And I click 'Continue to Shipping Method'
+    Then I should see a validation error 'Street Address is required.' next to the field
 
-  Scenario: Delete an address from the address book
-    Given I have an old address 'Previous Apartment' that I no longer use
-    When I am on the 'Address Book' page
-    And I click 'Delete Address' for the 'Previous Apartment'
-    And I confirm the deletion in the popup dialog
-    Then the 'Previous Apartment' address is no longer listed in my address book
+  Scenario: Shipping address form field validation [3]
+    Given I am on the shipping address step of the checkout
+    When I fill in the form but leave the 'ZIP Code' blank
+    And I click 'Continue to Shipping Method'
+    Then I should see a validation error 'A valid ZIP Code is required.' next to the field
 
-  Scenario: Add an item to the wishlist
-    Given I am a logged-in user viewing the 'Strive Endurance Fleece' product page
-    When I click the 'Add to Wish List' button
-    Then I see a success message 'Strive Endurance Fleece has been added to your Wish List.'
-    And I am redirected to my 'My Wish List' page
+  Scenario: Shipping address form field validation [4]
+    Given I am on the shipping address step of the checkout
+    When I fill in the form but leave the 'City' blank
+    And I click 'Continue to Shipping Method'
+    Then I should see a validation error 'City is required.' next to the field
 
-  Scenario: View items in the wishlist
-    Given I have previously added 'Hero Hoodie' and 'Push It Messenger Bag' to my wishlist
-    When I navigate to my 'My Wish List' page
-    Then I see both 'Hero Hoodie' and 'Push It Messenger Bag' listed
-    And I can see their price and an 'Add to Cart' button for each
+  Scenario: Certain items restrict shipping options
+    Given my cart contains a 'Bear Spray' canister, which has shipping restrictions
+    When I proceed to the shipping method step
+    Then 'Overnight Shipping' and 'Expedited Shipping' options should be disabled or not visible
+    And only 'Standard Ground Shipping' should be available
 
-  Scenario: Remove an item from the wishlist
-    Given my wishlist contains 'Strive Endurance Fleece'
-    When I am on my 'My Wish List' page
-    And I click the 'Remove item' (X) icon for 'Strive Endurance Fleece'
-    And I confirm the action
-    Then 'Strive Endurance Fleece has been removed from your Wish List.' message is displayed
-    And the item is no longer on the page
-
-  Scenario: Add an item from the wishlist to the cart
-    Given my wishlist contains 'Quest Lumaflex™ Band'
-    When I am on my 'My Wish List' page
-    And I click 'Add to Cart' for 'Quest Lumaflex™ Band'
-    Then the item is added to my shopping cart
-    And the cart quantity indicator updates
-
-  Scenario: Guest user cannot add item to wishlist
-    Given I am a guest user viewing a product page
-    When I click the 'Add to Wish List' button
-    Then I am redirected to the login page
-
-  Scenario: Product page displays 'In Stock' for available items
-    Given the 'Hero Hoodie' has a stock level greater than 0
-    When a shopper views the 'Hero Hoodie' product page
-    Then the availability status is displayed as 'In Stock'
-    And the 'Add to Cart' button is enabled
-
-  Scenario: Product page displays 'Out of Stock' for unavailable items
-    Given the 'Phoebe Zipper Sweatshirt' has a stock level of 0
-    When a shopper views the 'Phoebe Zipper Sweatshirt' product page
-    Then the availability status is displayed as 'Out of Stock'
-    And the 'Add to Cart' button is disabled or hidden
-
-  Scenario: API check prevents adding out-of-stock item to cart
-    Given the 'Phoebe Zipper Sweatshirt' (SKU `WS09`) is out of stock
-    When a user attempts to add SKU `WS09` to the cart via a direct API call
-    Then the API should return an error response with status code 4xx
-    And the response body should contain a message like 'The requested qty is not available'
-    And the user's cart remains unchanged
-
-  Scenario: Attempt to subscribe with an invalid email address
-    Given I am on any page with the newsletter subscription form
-    When I enter 'invalid-email' into the form
-    And I click 'Subscribe'
-    Then I see a client-side validation error 'Please enter a valid email address.'
+  Scenario: Go back from review page to edit the cart
+    Given I am on the 'Order Review' page
+    When I click the 'Edit Cart' link
+    Then I am taken back to the shopping cart page
+    And I can modify my cart's contents
 
