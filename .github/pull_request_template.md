@@ -1,4 +1,4 @@
-## Summary
+# Summary
 
 Generated tests and artifacts for: <!-- story id/title -->
 

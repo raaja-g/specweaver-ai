@@ -1,8 +1,9 @@
----
 name: Feature request
 about: Suggest an idea for this project
 labels: enhancement
----
+
+
+# Feature request
 
 ### Problem to solve
 
@@ -11,5 +12,3 @@ labels: enhancement
 ### Alternatives considered
 
 ### Additional context
-
-
