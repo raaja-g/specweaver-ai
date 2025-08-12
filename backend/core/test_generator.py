@@ -2,6 +2,7 @@
 Test Case Generator - Generates test cases from RequirementGraph
 """
 import json
+import re
 from typing import List, Dict, Any, Optional
 from itertools import product
 import logging
@@ -88,54 +89,107 @@ class TestCaseGenerator:
             system=system_prompt,
             task_type="bdd_generation"
         )
-        
+
+        # Try to coerce to JSON array safely (strip markdown or prefaces)
+        raw = (response.content or "").strip()
+        if not raw:
+            logger.error("Empty LLM response; using fallback features")
+            return self._generate_fallback_features(requirement)
+
+        # Extract first JSON array or object using simple delimiters
         try:
-            features = json.loads(response.content)
+            start = raw.find("[")
+            if start == -1:
+                start = raw.find("{")
+            end = len(raw)
+            # Attempt to trim trailing non-JSON
+            snippet = raw[start:end] if start != -1 else raw
+            features = json.loads(snippet)
             return features if isinstance(features, list) else [features]
         except Exception as e:
             logger.error(f"Failed to parse BDD features: {e}")
             return self._generate_fallback_features(requirement)
     
     def _generate_fallback_features(self, requirement: RequirementGraph) -> List[Dict[str, Any]]:
-        """Generate fallback BDD features when LLM fails"""
-        return [
-            {
-                "feature_name": "E-commerce Core Functionality",
-                "actor": "shopper",
-                "goal": "test the e-commerce website",
-                "benefit": "ensure all functionality works correctly",
-                "background": "Given I am on the e-commerce website",
-                "scenarios": [
-                    {
-                        "type": "scenario",
-                        "name": "Browse products successfully",
-                        "steps": [
-                            "When I navigate to the product catalog",
-                            "Then I see available products",
-                            "And I can view product details"
-                        ]
-                    },
-                    {
-                        "type": "scenario",
-                        "name": "Add product to cart",
-                        "steps": [
-                            "When I click 'Add to Cart' on a product",
-                            "Then the product is added to my cart",
-                            "And the cart count updates"
-                        ]
-                    },
-                    {
-                        "type": "scenario",
-                        "name": "Handle invalid actions gracefully",
-                        "steps": [
-                            "When I perform an invalid action",
-                            "Then I see appropriate error handling",
-                            "And the system remains stable"
-                        ]
-                    }
-                ]
-            }
-        ]
+        """Generate extensive fallback BDD features when LLM fails.
+        Deterministic, domain-agnostic but e-commerce-weighted coverage.
+        """
+        features: List[Dict[str, Any]] = []
+        def scen(name: str, steps: List[str]) -> Dict[str, Any]:
+            return {"type": "scenario", "name": name, "steps": steps}
+
+        # Homepage & Navigation
+        features.append({
+            "feature_name": "Homepage & Global Navigation",
+            "actor": "shopper",
+            "goal": "discover products and actions",
+            "benefit": "shop efficiently",
+            "background": "Given the site is available",
+            "scenarios": [
+                scen("Render homepage for a first-time visitor", [
+                    "When I open the homepage",
+                    "Then I see the cookie consent banner",
+                    "And I see the primary navigation and search"
+                ]),
+                scen("Accept cookie consent", [
+                    "Given I have not previously set consent",
+                    "When I accept cookies",
+                    "Then my consent is recorded"
+                ]),
+                {"type": "scenario_outline", "name": "Navigate to category", "steps": [
+                    "When I select the \"<category>\" menu item",
+                    "Then I land on the \"<expected_page>\" listing page"
+                ], "examples": [
+                    {"category": "Men > Shoes", "expected_page": "Men Shoes"},
+                    {"category": "Women > Dresses", "expected_page": "Women Dresses"}
+                ]}
+            ]
+        })
+
+        # Search
+        features.append({
+            "feature_name": "Search",
+            "actor": "shopper",
+            "goal": "find relevant products",
+            "benefit": "quick discovery",
+            "background": "Given I am on any page with a search input",
+            "scenarios": [
+                {"type": "scenario_outline", "name": "Execute keyword search", "steps": [
+                    "When I search for \"<query>\"",
+                    "Then I see results relevant to \"<query>\"",
+                    "And the total result count is displayed"
+                ], "examples": [
+                    {"query": "running shoes"},
+                    {"query": "128GB phone"},
+                    {"query": "blue jeans"}
+                ]},
+                scen("No-results state", [
+                    "When I search for \"zzzxxyy\"",
+                    "Then I see a friendly no results message"
+                ])
+            ]
+        })
+
+        # Cart & Checkout (sample)
+        features.append({
+            "feature_name": "Cart & Mini-cart",
+            "actor": "shopper",
+            "goal": "manage items",
+            "benefit": "complete purchase",
+            "background": "Given I have at least one item in my cart",
+            "scenarios": [
+                scen("View mini-cart", [
+                    "When I open the mini-cart",
+                    "Then I see line items and subtotal"
+                ]),
+                scen("Apply coupon code", [
+                    "When I apply coupon \"WELCOME10\"",
+                    "Then totals reflect the coupon"
+                ])
+            ]
+        })
+
+        return features
     
     def _convert_features_to_test_cases(self, features: List[Dict[str, Any]]) -> List[TestCase]:
         """Convert BDD Features to TestCase format for compatibility"""
@@ -195,7 +249,6 @@ class TestCaseGenerator:
             return {"action": "cart.add_item", "params": {"button": "Add to Cart"}}
         elif "search for" in step_lower:
             # Extract search query
-            import re
             match = re.search(r'"([^"]*)"', step)
             query = match.group(1) if match else "test query"
             return {"action": "search.execute", "params": {"query": query}}

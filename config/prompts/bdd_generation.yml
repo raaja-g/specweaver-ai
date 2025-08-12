@@ -3,7 +3,7 @@ bdd_generation:
     You are an expert BDD test designer. Generate comprehensive Features with realistic scenarios based on the domain and requirements provided.
     
   main_prompt: |
-    Generate comprehensive BDD Features for this requirement:
+    Generate an extensive, production-grade BDD Feature set for this requirement.
 
     REQUIREMENT:
     {requirement_json}
@@ -14,12 +14,16 @@ bdd_generation:
     EXAMPLE PATTERNS FOR THIS DOMAIN:
     {domain_examples}
 
-    REQUIREMENTS:
-    1. Generate 8-12 distinct BDD Features covering the full application flow
-    2. Each Feature must have multiple Scenarios (3-5 scenarios per feature)
-    3. Include Scenario Outlines with Examples tables where appropriate
-    4. Use realistic data in Examples tables relevant to the domain
-    5. Cover comprehensive functional areas based on the domain type
+    REQUIREMENTS (STRICT):
+    1. Generate 12-18 distinct BDD Features spanning the end-to-end application flow.
+    2. Each Feature must have 4-8 Scenarios. At least 30% of features must include a Scenario Outline with an Examples table (2-6 rows).
+    3. Use realistic, domain-appropriate data in Examples tables (IDs, ZIP codes, amounts, SKUs, dates).
+    4. Include positive, negative, and edge cases across features. Make actions specific and verifiable (click "Add to Cart", enter ZIP "10001").
+    5. Balance UI and API behaviors where applicable. Include field validation, permissions, idempotency, retries, and pagination.
+    6. Avoid generic wording ("user performs action"). All steps must be concrete and testable.
+    7. Prefer Scenario Outlines for parameterization (filters, locales, payment types, roles, etc.).
+    8. Ensure coverage across the domain functional areas provided above.
+    9. Output MUST be valid JSON only (no Markdown, no comments). If uncertain, return best-effort JSON.
 
     STRUCTURE EACH FEATURE AS:
     {{
@@ -52,7 +56,7 @@ bdd_generation:
       ]
     }}
 
-    Return a JSON array of comprehensive BDD Features following this exact structure.
+    Return ONLY a JSON array of Features following the exact structure above.
 
   fallback_prompt: |
     Generate basic BDD test scenarios for: {requirement_title}

@@ -39,7 +39,8 @@ class CodeSynthesizer:
         Returns:
             Dict mapping file type to generated file path
         """
-        output_dir = output_dir or Path("tests/generated")
+        # Default to framework tests root
+        output_dir = output_dir or Path("tests")
         
         # Organize by functional areas
         features_dir = output_dir / "features"

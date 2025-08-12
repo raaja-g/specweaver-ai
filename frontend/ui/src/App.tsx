@@ -37,12 +37,20 @@ interface Requirement {
   status: string;
 }
 
+interface Step {
+  action: string;
+  params?: Record<string, any>;
+}
+
 interface TestCase {
   id: string;
   title: string;
   type: string;
   priority: string;
   trace_to: string[];
+  preconditions?: string[];
+  steps?: Step[];
+  data?: { examples?: Array<Record<string, any>> };
 }
 
 interface TestSuite {

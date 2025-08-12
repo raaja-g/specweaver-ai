@@ -42,8 +42,8 @@ def _persist_run(run_id: str, record: Dict) -> None:
 def run_tests_job(run_id: str, session_id: str, ui_mode: str, api_mode: str, auto_pr: bool = False, requirement_id: str | None = None) -> Dict:
     import os
     
-    # Use new functional structure: tests/{session_id}/
-    test_dir = Path("tests") / session_id
+    # Use framework structure: write and run from tests/ root
+    test_dir = Path("tests")
     
     # Get browser config from environment
     browser = os.getenv("BROWSER", "chromium")

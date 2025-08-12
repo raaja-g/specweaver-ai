@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "pages": {
+    "user": {
+      "action": [
+        {
+          "click": "[data-action='action']"
+        }
+      ]
+    }
+  },
+  "created_at": "2025-08-12T02:42:36.726665",
+  "auto_generated": true
+}

@@ -127,6 +127,13 @@ class LLMOrchestrator:
     
     def _should_use_local(self, prompt: str, task_type: str) -> bool:
         """Determine if local model should be preferred"""
+        # Respect routing config: disable local if not enabled
+        try:
+            routing = self.model_config.get("routing", {})
+            if not routing.get("enable_local", False):
+                return False
+        except Exception:
+            return False
         # Use local for sensitive data or high-volume tasks
         if self._is_sensitive(prompt):
             logger.info("Using local model for sensitive data")

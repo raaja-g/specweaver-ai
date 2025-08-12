@@ -340,7 +340,8 @@ async def approve_tests(session_id: str, req: ApprovalRequest):
         config = ExecutionConfig()
         synthesizer = CodeSynthesizer()
         
-        test_dir = Path("tests") / session_id
+        # Write directly to framework tests/ root (no per-session folders)
+        test_dir = Path("tests")
         test_suite.test_cases = approved_cases  # Only approved
         generated_files = synthesizer.synthesize(requirement, test_suite, config, test_dir)
         
@@ -419,8 +420,8 @@ async def execute_tests(run_id: str, req: RunRequest):
         test_runs[run_id]["status"] = "running"
         test_runs[run_id]["started_at"] = datetime.utcnow()
         
-        # Run pytest
-        test_dir = Path("tests") / "approved" / req.session_id
+        # Run pytest from framework tests/ root
+        test_dir = Path("tests")
         cmd = [
             "pytest", str(test_dir),
             "-q", "--tb=short",
@@ -469,12 +470,25 @@ async def get_run_status(run_id: str):
     if run_id not in test_runs:
         raise HTTPException(status_code=404, detail="Run not found")
     
-    run_data = test_runs[run_id].copy()
+    # Attempt to refresh from persisted file to avoid stale "queued" status
+    try:
+        if RUNS_FILE.exists():
+            data = json.loads(RUNS_FILE.read_text())
+            if run_id in data:
+                # Coerce timestamps
+                for ts in ["created_at", "started_at", "completed_at"]:
+                    if data[run_id].get(ts):
+                        try:
+                            data[run_id][ts] = datetime.fromisoformat(data[run_id][ts])
+                        except Exception:
+                            pass
+                test_runs[run_id].update(data[run_id])
+    except Exception:
+        logger.exception("Failed to refresh run status in get_run_status")
     
-    # Add logs and reports if available
+    run_data = test_runs[run_id].copy()
     run_data['logs'] = _get_run_logs(run_id)
     run_data['reports'] = _get_run_reports(run_id)
-    
     return run_data
 
 
