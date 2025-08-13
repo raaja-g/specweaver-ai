@@ -1,5 +1,5 @@
 @checkout
-Feature: to add a product to my cart and check out with a credit card
+Feature: Auto Synthesized
 
   Scenario: View available shipping methods and costs
     Given I am on the shipping method step of checkout with a subtotal of $50.00

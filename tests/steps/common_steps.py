@@ -1,22 +1,18 @@
-# Generic catch-all step definitions to allow feature scenarios to run without specific implementations
+import os
 from pytest_bdd import given, when, then, parsers
 
 
-@given(parsers.re(r"^.+$"))
-def generic_given():
-    # Placeholder for any Given step
-    pass
+# Enable generic catch-all steps ONLY when explicitly requested.
+# This prevents tests from auto-passing without real step logic.
+if os.getenv("ALLOW_GENERIC_STEPS", "0").lower() in {"1", "true", "yes"}:
+    @given(parsers.re(r"^.+$"))
+    def generic_given():
+        pass
 
+    @when(parsers.re(r"^.+$"))
+    def generic_when():
+        pass
 
-@when(parsers.re(r"^.+$"))
-def generic_when():
-    # Placeholder for any When step
-    pass
-
-
-@then(parsers.re(r"^.+$"))
-def generic_then():
-    # Placeholder for any Then step
-    pass
-
-
+    @then(parsers.re(r"^.+$"))
+    def generic_then():
+        pass

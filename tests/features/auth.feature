@@ -1,5 +1,5 @@
 @auth
-Feature: to add a product to my cart and check out with a credit card
+Feature: Auto Synthesized
 
   Scenario: Successful login with valid credentials
     Given I am on the login page

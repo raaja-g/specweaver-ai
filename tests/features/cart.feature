@@ -1,5 +1,5 @@
 @cart
-Feature: to add a product to my cart and check out with a credit card
+Feature: Auto Synthesized
 
   Scenario: Add a single, in-stock product to an empty cart
     Given I am logged in and viewing the product 'Waterproof Shell Jacket' (SKU: WJK-RED-M) which is in stock

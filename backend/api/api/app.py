@@ -440,7 +440,10 @@ async def execute_tests(run_id: str, req: RunRequest):
         if req.tags:
             cmd.extend(["-m", " or ".join(req.tags)])
         
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # Ensure strict BDD by default (no generic steps)
+        env = os.environ.copy()
+        env.setdefault("ALLOW_GENERIC_STEPS", "0")
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
         
         # Update run status
         test_runs[run_id]["status"] = "completed" if result.returncode == 0 else "failed"
