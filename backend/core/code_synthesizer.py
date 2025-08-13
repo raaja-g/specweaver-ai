@@ -162,11 +162,12 @@ class CodeSynthesizer:
         """Generate step definitions for specific functional area"""
         template = self.env.get_template("pytest_steps.j2")
 
-        # Extract raw Gherkin lines into explicit Given/When/Then sets
+        # Extract explicit Given/When/Then from (1) test case raw_steps and (2) actual feature file
         given_lines: set[str] = set()
         when_lines: set[str] = set()
         then_lines: set[str] = set()
 
+        # 1) From test cases (if present)
         for tc in test_cases:
             raw = getattr(tc, 'data', {}) if isinstance(getattr(tc, 'data', {}), dict) else {}
             raw_steps = raw.get('raw_steps') or []
@@ -195,6 +196,43 @@ class CodeSynthesizer:
                         when_lines.add(content_only)
                     else:
                         then_lines.add(content_only)
+
+        # 2) From generated or existing feature file
+        try:
+            # tests/steps/<area>/ -> tests/features/<area>.feature
+            feature_path = steps_dir.parents[2] / 'features' / f'{area}.feature'
+            if feature_path.exists():
+                last: str | None = None
+                for raw_line in feature_path.read_text().splitlines():
+                    line = raw_line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    head = line.split(' ', 1)[0]
+                    if head in {'Feature:', 'Scenario:', 'Scenario:', 'Scenario', 'ScenarioOutline:', 'Scenario', 'Background:', 'Examples:', 'Example:', 'Scenario Outline:'}:
+                        last = None
+                        continue
+                    if line.startswith('@') or line.startswith('|'):
+                        continue
+                    lower = line.lower()
+                    if lower.startswith('given '):
+                        given_lines.add(line[6:])
+                        last = 'given'
+                    elif lower.startswith('when '):
+                        when_lines.add(line[5:])
+                        last = 'when'
+                    elif lower.startswith('then '):
+                        then_lines.add(line[5:])
+                        last = 'then'
+                    elif lower.startswith('and '):
+                        content_only = line[4:]
+                        if last == 'given':
+                            given_lines.add(content_only)
+                        elif last == 'when':
+                            when_lines.add(content_only)
+                        elif last == 'then':
+                            then_lines.add(content_only)
+        except Exception:
+            pass
 
         content = template.render(
             requirement=requirement,
