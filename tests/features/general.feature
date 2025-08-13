@@ -1,80 +1,77 @@
 @general
-Feature: Auto Synthesized
+Feature: to add a product to my cart and check out with a credit card
 
-  Scenario: View details of an in-stock product with multiple variants
-    Given I am on the product page for 'TrailMax Hiking Backpack' (SKU: HBP-GRN-40L)
-    Then I should see the product name 'TrailMax Hiking Backpack'
-    And I should see the price '$99.95'
-    And I should see a gallery with at least 3 product images
-    And I should see a color selector with options 'Forest Green', 'Ocean Blue', and 'Slate Grey'
-    And I should see a stock status message 'In Stock'
+  Scenario: [P0] View details of a standard in-stock product
+    Given I am a registered shopper and I am on the product page for SKU 'KC-ELITE-24'
+    Then I should see the product name 'Keurig K-Elite Coffee Maker'
+    And I should see the price '$189.99'
+    And I should see the 'Add to Cart' button is enabled
+    And I see a stock status of 'In Stock'
 
-  Scenario: View details of a product that is out of stock
-    Given I am on the product page for 'Limited Edition Compass' (SKU: CMP-LTD-01)
-    Then I should see the product name 'Limited Edition Compass'
-    And I should see a stock status message 'Out of Stock'
+  Scenario: [P1] View details of an out-of-stock product
+    Given I am a registered shopper and I am on the product page for SKU 'LOGI-MXM3-OOS'
+    Then I should see the product name 'Logitech MX Master 3 Mouse'
+    And I should see a stock status of 'Out of Stock'
     And the 'Add to Cart' button should be disabled
-    And I should see an option to 'Notify me when back in stock'
+    And I should see an option to 'Notify Me When Available'
 
-  Scenario: Selecting a different product variant updates the page
-    Given I am on the product page for 'TrailMax Hiking Backpack' (SKU: HBP-GRN-40L)
-    When I select the color 'Ocean Blue'
-    Then the main product image should update to show the blue backpack
-    And the SKU displayed on the page should update to 'HBP-BLU-40L'
+  Scenario: [P2] Interact with product image gallery
+    Given I am on the product page for 'Bose QC45 Headphones'
+    And I see a primary image and 3 thumbnail images
+    When I click the second thumbnail image
+    Then the primary image updates to show the second product view
+    When I click the primary image
+    Then a full-screen image zoom modal opens
 
-  Scenario: View product reviews and ratings
-    Given I am on the product page for 'TrailMax Hiking Backpack'
-    When I scroll down to the 'Reviews' section
-    Then I should see an average star rating, such as '4.7 out of 5 stars'
-    And I should see a list of customer reviews with reviewer names, ratings, and comments
+  Scenario: [P0] Select different product variants and see updated information [1]
+    Given I am on the product page for the 'TrailRunner X1 Jacket'
+    When I select the color 'Ocean Blue' and size 'Medium'
+    Then the product image updates to show the 'Ocean Blue' jacket
+    And the SKU displayed on the page updates to 'TRX1-BLU-M'
+    And the 'Add to Cart' button is enabled
 
-  Scenario: Apply a valid percentage-based discount code
-    Given I am on the cart page with a subtotal of $200.00
-    When I enter the valid discount code 'SAVE15' in the discount code field
+  Scenario: [P0] Select different product variants and see updated information [2]
+    Given I am on the product page for the 'TrailRunner X1 Jacket'
+    When I select the color 'Crimson Red' and size 'Large'
+    Then the product image updates to show the 'Crimson Red' jacket
+    And the SKU displayed on the page updates to 'TRX1-RED-L'
+    And the 'Add to Cart' button is enabled
+
+  Scenario: [P0] Select different product variants and see updated information [3]
+    Given I am on the product page for the 'TrailRunner X1 Jacket'
+    When I select the color 'Forrest Green' and size 'Small'
+    Then the product image updates to show the 'Forrest Green' jacket
+    And the SKU displayed on the page updates to 'TRX1-GRN-S'
+    And the 'Add to Cart' button is enabled
+
+  Scenario: [P1] Apply a valid percentage-based discount code
+    Given I have items in my cart with a subtotal of $150.00
+    When I am on the cart page
+    And I enter the valid discount code 'SAVE20' for 20% off
     And I click 'Apply'
-    Then I see a message 'Discount code SAVE15 applied successfully.'
-    And a line item for 'Discount (15%)' appears with a value of '-$30.00'
-    And the order total is updated to $170.00
+    Then I see a discount line item of '-$30.00'
+    And the new order total is $120.00
 
-  Scenario: Apply a valid fixed-amount discount code
-    Given I am on the cart page with a subtotal of $80.00
-    When I enter the valid discount code 'TENOFF' in the discount code field
+  Scenario: [P1] Apply a valid fixed-amount discount code
+    Given I have items in my cart with a subtotal of $75.00
+    When I am on the cart page
+    And I enter the valid discount code '10OFF' for $10 off
     And I click 'Apply'
-    Then a line item for 'Discount' appears with a value of '-$10.00'
-    And the order total is updated to $70.00
+    Then I see a discount line item of '-$10.00'
+    And the new order total is $65.00
 
-  Scenario: Attempt to apply a discount code that does not meet minimum spend
-    Given I am on the cart page with a subtotal of $45.00
-    When I enter the discount code 'SAVE50' which requires a $50 minimum spend
-    And I click 'Apply'
-    Then I should see an error message 'This discount code requires a minimum purchase of $50.00.'
-
-  Scenario: Invalid and expired discount code validation [1]
+  Scenario: [P2] Attempt to apply an expired discount code
     Given I am on the cart page
-    When I enter the discount code 'INVALIDCODE'
+    When I enter the expired discount code 'SUMMER22'
     And I click 'Apply'
-    Then I should see an error message 'Discount code 'INVALIDCODE' is not valid.'
-    And the order total should not change
+    Then I see an error message 'This discount code is expired.'
+    And the order total remains unchanged
 
-  Scenario: Invalid and expired discount code validation [2]
-    Given I am on the cart page
-    When I enter the discount code 'EXPIRED2020'
+  Scenario: [P2] Attempt to apply a discount code that does not meet minimum purchase requirement
+    Given I have items in my cart with a subtotal of $40.00
+    And the discount code 'BIGSPENDER' requires a $100 minimum purchase
+    When I enter the discount code 'BIGSPENDER'
     And I click 'Apply'
-    Then I should see an error message 'This discount code is expired.'
-    And the order total should not change
-
-  Scenario: Invalid and expired discount code validation [3]
-    Given I am on the cart page
-    When I enter the discount code 'ALREADYUSED'
-    And I click 'Apply'
-    Then I should see an error message 'This discount code has already been used.'
-    And the order total should not change
-
-  Scenario: User can switch to a different saved card after a decline
-    Given I am a logged-in user with two saved credit cards, 'Visa ending in 4242' and 'Mastercard ending in 5555'
-    And my payment attempt with the Visa card was declined
-    When I select the 'Mastercard ending in 5555'
-    And I submit the payment again
-    Then the payment should be authorized successfully
-    And I should proceed to the order review page
+    Then I see an error message 'Your order must be at least $100.00 to use this code.'
+    And the order total remains unchanged
 

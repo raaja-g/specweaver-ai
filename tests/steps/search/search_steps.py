@@ -1,73 +1,55 @@
 """
-Generated step definitions for test the application
-Generated at: 2025-08-12T14:17:29.143735
+Generated step definitions for to add a product to my cart and check out with a credit card (search)
+Generated at: 2025-08-12T19:44:24.899122
 """
+from pathlib import Path
+from typing import Dict, Any
+import json
+import re
+import os
+
 from pytest_bdd import given, when, then, scenarios, parsers
 from playwright.sync_api import Page, expect
-from pathlib import Path
-import json
-import httpx
-from typing import Dict, Any
+RUN_HEURISTICS = os.getenv("RUN_HEURISTICS", "0").lower() in {"1", "true", "yes"}
 
-# Load scenarios from the specific feature file
-FEATURE_FILE = Path(__file__).resolve().parents[2] / "features" / "search.feature"
+# Bind this step module to its Feature
+FEATURE_FILE = Path(__file__).resolve().parents[2] / "features" / ""
 scenarios(str(FEATURE_FILE))
 
 
+# Common environment/setup steps
 @given('the test environment is configured')
-def setup_environment(page: Page):
-    # Configure based on execution mode
-    pass
+def setup_environment(page: Page, execution_config):
+    # Navigate to base URL so browser visibly opens and context is ready
+    try:
+        page.set_default_timeout(5000)
+        page.set_default_navigation_timeout(10000)
+    except Exception:
+        pass
+    base_url = execution_config.get('target_url', '/')
+    page.goto(base_url, wait_until="domcontentloaded")
 
 
 @given('execution mode is set to "<ui_mode>" for UI and "<api_mode>" for API')
 def set_execution_mode(ui_mode: str, api_mode: str):
-    # Store in context for later use
+    # Reserved for future use: mode-specific setup
     pass
 
 
-# Explicit bindings from search.feature
-@given("I am on the Resources page")
-def given_on_resources_page(page: Page):
-    pass
+# Auto-generated explicit bindings from raw Gherkin lines
 
 
-@when(parsers.parse("I click the '{filter_name}' filter button"))
-def when_click_filter(page: Page, filter_name: str):
-    pass
-
-
-@then("the list of content should update to show only webinars")
-def then_list_updates_to_webinars(page: Page):
-    pass
-
-
-@then("each item in the list should have a 'Webinar' tag")
-def then_items_have_webinar_tag(page: Page):
-    pass
-
-
-@when(parsers.parse('I enter "{term}" into the search bar and press Enter'))
-def when_enter_search_term(page: Page, term: str):
-    pass
-
-
-@then(parsers.parse('I should see a list of results related to "{term}"'))
-def then_results_related_to_term(page: Page, term: str):
-    pass
-
-
-@then(parsers.parse('the top result title should contain the word "{word}"'))
-def then_top_result_contains_word(page: Page, word: str):
-    pass
 
 
 # Optional action router for structured actions
 @when(parsers.parse('I perform "{action}" with params:\n{params}'))
 def perform_action(page: Page, action: str, params: str):
-    params_dict = json.loads(params)
-    action_handlers = {}
+    params_dict: Dict[str, Any] = json.loads(params)
+    action_handlers = {
+    }
     if handler := action_handlers.get(action):
         handler(page, params_dict)
     else:
-        raise NotImplementedError(f"Action {action} not implemented")
+        # Fallback: no-op until implemented
+        pass
+

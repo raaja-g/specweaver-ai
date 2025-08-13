@@ -45,7 +45,12 @@ def given_{{ loop.index }}(page: Page, execution_config):
     # Heuristic: if the step declares a page state, open the base URL
     base_url = execution_config.get('target_url', '/')
     if re.search(r"\bI am on\b|\bpage\b|\bhomepage\b", "{{ line }}", flags=re.IGNORECASE):
-        page.goto(base_url)
+        try:
+            page.set_default_timeout(5000)
+            page.set_default_navigation_timeout(10000)
+        except Exception:
+            pass
+        page.goto(base_url, wait_until="domcontentloaded")
     # Additional preconditions can be implemented here
     pass
 {% endfor %}
